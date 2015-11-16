@@ -140,7 +140,7 @@ bool server::init()
 
     //Creating threads
     g_workers_count = g_worker_threads_per_processor * get_proc_count();
-    std::cout << "Threads count: \n" << g_workers_count;
+    std::cout << "Threads count: " << g_workers_count << std::endl;
     g_worker_threads = new HANDLE[g_workers_count];
 
     for (auto i = 0; i < g_workers_count;i++)
@@ -200,23 +200,14 @@ int server::main_cycle()
         }
 
         //Sending greetings
-        DWORD dwFlags = 0;
-        DWORD dwBytes = 0;
         std::string greetings = STR_GREETINGS + client_name + "!\r\n";
 
-        client->reset_buffer();
-        WSABUF* bff = client->get_wsabuff_ptr();
-        CopyMemory(bff->buf, greetings.c_str(), greetings.length());
-        bff->len = greetings.length();
-        int res = WSASend(client->get_socket(), bff, 1, &dwBytes, dwFlags, client->get_overlapped_ptr(), nullptr);
-        int lasterr = WSAGetLastError();
-        if ((SOCKET_ERROR == res) && (WSA_IO_PENDING != lasterr))
+        if (!client->send(greetings))
         {
-            printf("\nError in Initial send. %d\n", lasterr);
+            printf("\nError in Initial send. %d\n", WSAGetLastError());
             g_client_storage.detach_client(client);
             continue;
         }
-        client->op_code = OP_SEND;
     }
     shutdown();
     return 0;

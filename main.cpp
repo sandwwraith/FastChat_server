@@ -6,6 +6,5 @@ int main()
     server serv;
     serv.init();
     serv.main_cycle();
-    std::cout << "Exiting...\n";
     return 0;
 }
