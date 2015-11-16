@@ -129,6 +129,18 @@ SOCKET server::create_listen_socket()
     return sock;
 }
 
+int server::get_proc_count()
+{
+    if (g_processors_count == -1)
+    {
+        //Getting system info
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        g_processors_count = si.dwNumberOfProcessors;
+    }
+    return g_processors_count;
+}
+
 bool server::init()
 {
     //Initializing WSA
@@ -149,13 +161,15 @@ bool server::init()
     }
 
     //Creating threads
-    g_workers_count = WORKER_THREADS_PER_PROCESSOR * g_processors_count;
+    g_workers_count = g_worker_threads_per_processor * get_proc_count();
+    std::cout << "Threads count: \n" << g_workers_count;
     g_worker_threads = new HANDLE[g_workers_count];
 
     for (auto i = 0; i < g_workers_count;i++)
     {
         g_worker_threads[i] = CreateThread(nullptr, 0, WorkerThread, this, 0, nullptr);
     }
+    g_started = true;
     return true;
 }
 
@@ -246,6 +260,18 @@ void server::shutdown()
     delete[] g_worker_threads;
     WSACleanup();
     g_started = false;
+}
+
+int server::get_worker_threads_per_processor() const
+{
+    return g_worker_threads_per_processor;
+}
+
+bool server::set_worker_threads_per_processor(int g_worker_threads_per_processor1)
+{
+    if (g_started) return false;
+    g_worker_threads_per_processor = g_worker_threads_per_processor1;
+    return true;
 }
 
 bool server::set_port(int new_port)

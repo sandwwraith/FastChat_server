@@ -11,11 +11,8 @@
 
 #pragma comment(lib,"Ws2_32.lib")
 
-#ifndef GLOBALS_AND_CONSTANTS_SERVER
-#define GLOBALS_AND_CONSTANTS_SERVER
-
-//Number of threads per processor
-#define WORKER_THREADS_PER_PROCESSOR 2
+#ifndef CONSTANTS_SERVER
+#define CONSTANTS_SERVER
 
 //Operation codes for clients
 
@@ -34,7 +31,12 @@ class server
 private:
     //Global parameter for server port
     int g_server_port = 2539;
+public:
+    //Returns true if port was setted (false if server already started)
+    bool set_port(int new_port);
+    int get_port() const;
 
+private:
     //Global array of worker threads
     HANDLE* g_worker_threads = nullptr;
 
@@ -42,9 +44,15 @@ private:
     int g_workers_count = 0;
 
     //Number of processors in system
-    //TODO: get it from somewhere
-    int g_processors_count = 4;
+    int g_processors_count = -1;
 
+    //Number of threads per processor
+    int g_worker_threads_per_processor = 2;
+public:
+    int get_worker_threads_per_processor() const;
+    bool set_worker_threads_per_processor(int g_worker_threads_per_processor1);
+
+private:
     //Main IOCP port
     HANDLE g_io_completion_port;
 
@@ -57,10 +65,7 @@ private:
 
 public:
 
-    //Returns true if port was setted (false if server already started)
-    bool set_port(int new_port);
-    int get_port() const;
-
+    int get_proc_count();
     server();
     //if init_now is true, inits server immedeately
     explicit server(bool init_now);
