@@ -76,9 +76,8 @@ Client::Client(SOCKET s) : socket(s)
     wsabuf = new WSABUF;
 
     ZeroMemory(overlapped, sizeof(OVERLAPPED));
-    //overlapped->hEvent = NULL;// i dont believe in magic
     ZeroMemory(wsabuf, sizeof(WSABUF));
-    wsabuf->buf = (char*)malloc(MAX_BUFFER_SIZE*sizeof(char));
+    wsabuf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
     reset_buffer();
 }
 

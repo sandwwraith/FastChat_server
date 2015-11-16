@@ -45,7 +45,7 @@ public:
     bool recieve();
     bool send(std::string);
 
-    //Call it when you've received smth. Returns true if message complete (ends with control character)
+    //Call it when you've received smth. See ATTACH_RESULT for details.
     ATTACH_RESULT attach_bytes_to_message();
 
     explicit Client(SOCKET s);

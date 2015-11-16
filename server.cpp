@@ -4,8 +4,8 @@
 DWORD server::WorkerThread(LPVOID param)
 {
     server* me = (server*)param;
-    void* context = NULL;
-    OVERLAPPED* pOverlapped = NULL;
+    void* context = nullptr;
+    OVERLAPPED* pOverlapped = nullptr;
     DWORD dwBytesTransfered = 0;
 
     while (true)
@@ -178,7 +178,6 @@ int server::main_cycle()
         sockaddr_in client_address;
         int cl_length = sizeof(client_address);
         SOCKET accepted = WSAAccept(sock, reinterpret_cast<sockaddr*>(&client_address), &cl_length, nullptr, 0);
-        //SOCKET accepted = accept(sock, (sockaddr*)&client_address, &cl_length);
         if (accepted == INVALID_SOCKET)
         {
             if (WSAGetLastError() != WSAEWOULDBLOCK)
