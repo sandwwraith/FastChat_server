@@ -31,6 +31,7 @@ private:
     
 public:
     int op_code;
+    int id;
     std::string last_message;
 
     char* get_buffer_data();

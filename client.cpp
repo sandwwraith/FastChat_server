@@ -1,4 +1,6 @@
 #include "client.h"
+#include <iostream>
+#include <thread>
 
 
 char* Client::get_buffer_data()
@@ -29,23 +31,25 @@ void Client::reset_buffer()
 
 bool Client::recieve()
 {
+    std::cout << id << " receiving...(#" << std::this_thread::get_id() << std::endl;
     DWORD dwBytes, dwFlags = 0;
     reset_buffer();
-    int snd = WSARecv(this->get_socket(), this->get_wsabuff_ptr(), 1, &dwBytes, &dwFlags, this->get_overlapped_ptr(), nullptr);
     this->op_code = OP_RECV;
+    int snd = WSARecv(this->get_socket(), this->get_wsabuff_ptr(), 1, &dwBytes, &dwFlags, this->get_overlapped_ptr(), nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
 bool Client::send(std::string message)
 {
+    std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
     this->reset_buffer();
     CopyMemory(wsabuf->buf, message.c_str(), message.length());
     wsabuf->len = message.length();
 
     DWORD dwBytes = 0;
     DWORD dwFlags = 0;
-    auto snd = WSASend(this->socket, wsabuf, 1, &dwBytes, dwFlags, overlapped, nullptr);
     op_code = OP_SEND;
+    auto snd = WSASend(this->socket, wsabuf, 1, &dwBytes, dwFlags, overlapped, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
@@ -83,6 +87,7 @@ Client::Client(SOCKET s) : socket(s)
 
 Client::~Client()
 {
+    std::cout << id << " destroyed\n";
     //Wait for the pending operations to complete
     while (!HasOverlappedIoCompleted(overlapped))
     {
