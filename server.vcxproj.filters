@@ -24,15 +24,18 @@
     <ClCompile Include="client_storage.cpp">
       <Filter>Файлы исходного кода</Filter>
     </ClCompile>
+    <ClCompile Include="server.cpp">
+      <Filter>Файлы исходного кода</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="globals_and_constants.h">
-      <Filter>Заголовочные файлы</Filter>
-    </ClInclude>
     <ClInclude Include="client.h">
       <Filter>Заголовочные файлы</Filter>
     </ClInclude>
     <ClInclude Include="client_storage.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
+    <ClInclude Include="server.h">
       <Filter>Заголовочные файлы</Filter>
     </ClInclude>
   </ItemGroup>
