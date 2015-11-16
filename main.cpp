@@ -12,7 +12,7 @@ bool init()
     }
 
     //Initializing IOCP
-    g_io_completion_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
+    g_io_completion_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
     if (g_io_completion_port == nullptr)
     {
         printf("IOCompletionPort init failed: %d\n", WSAGetLastError());
@@ -41,12 +41,12 @@ SOCKET create_listen_socket()
     }
 
     sockaddr_in serv_address;
-    serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
-    //address.sin_addr.s_addr = inet_addr("127.0.0.1");
+    //serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
+    serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
     serv_address.sin_family = AF_INET ;
     serv_address.sin_port = htons(g_server_port);
 
-    int res = bind(sock, reinterpret_cast<sockaddr *>(&serv_address), sizeof(serv_address));
+    int res = bind(sock, reinterpret_cast<sockaddr*>(&serv_address), sizeof(serv_address));
     if (res == SOCKET_ERROR)
     {
         std::cout << "bind error\n";
@@ -88,7 +88,7 @@ int main()
 
         sockaddr_in client_address;
         int cl_length = sizeof(client_address);
-        SOCKET accepted = WSAAccept(sock, (sockaddr*)&client_address, &cl_length, nullptr,0);
+        SOCKET accepted = WSAAccept(sock, reinterpret_cast<sockaddr*>(&client_address), &cl_length, nullptr,0);
         //SOCKET accepted = accept(sock, (sockaddr*)&client_address, &cl_length);
         if (accepted == INVALID_SOCKET)
         {
@@ -103,7 +103,7 @@ int main()
         g_client_storage.attach_client(client);
 
         //Associating client with IOCP
-        if (CreateIoCompletionPort((HANDLE)client->get_socket(),g_io_completion_port,(DWORD)client,0) == nullptr)
+        if (CreateIoCompletionPort((HANDLE)client->get_socket(),g_io_completion_port,(ULONG_PTR)client,0) == nullptr)
         {
             std::cout << "Error linking client to completion port\n";
             g_client_storage.detach_client(client);
@@ -208,7 +208,7 @@ DWORD WINAPI WorkerThread(LPVOID Param)
 
     while (true)
     {
-        BOOL res = GetQueuedCompletionStatus(g_io_completion_port, &dwBytesTransfered, (LPDWORD)&context, &pOverlapped, INFINITE);
+        BOOL res = GetQueuedCompletionStatus(g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &pOverlapped, INFINITE);
         if (!res)
         {
             //Concurrency issues
