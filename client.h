@@ -4,6 +4,19 @@
 //Maximum buffer size for I/O Operations
 #define MAX_BUFFER_SIZE 256
 
+//Operation codes for clients
+
+#define OP_SEND 1
+//Server sends data to client
+#define OP_RECV 2
+//Server recievs data
+
+//Bytes operation results types
+#define MESSAGE_COMPLETE 0x1
+#define MESSAGE_INCOMPLETE 0x2
+#define CLIENT_DISCONNECT 0x4
+typedef int ATTACH_RESULT;
+
 class Client
 {
 private:
@@ -18,14 +31,22 @@ private:
     
 public:
     int op_code;
-    std::string client_message;
+    std::string last_message;
 
-    char* get_buffer_data() const;
+    char* get_buffer_data();
     int get_buffer_size() const;
-    WSABUF* get_wsabuff_ptr() const;
-    OVERLAPPED* get_overlapped_ptr() const;
+    WSABUF* get_wsabuff_ptr();
+    OVERLAPPED* get_overlapped_ptr();
     void reset_buffer();
     SOCKET get_socket();
+
+   
+    //Remember, this will reset your buffer
+    bool recieve();
+    bool send(std::string);
+
+    //Call it when you've received smth. Returns true if message complete (ends with control character)
+    ATTACH_RESULT attach_bytes_to_message();
 
     explicit Client(SOCKET s);
     ~Client();

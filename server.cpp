@@ -8,13 +8,10 @@ DWORD server::WorkerThread(LPVOID param)
     OVERLAPPED* pOverlapped = NULL;
     DWORD dwBytesTransfered = 0;
 
-    int snd;
-    DWORD dwBytes = 0, dwFlags = 0;
-
     while (true)
     {
-        BOOL res = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &pOverlapped, INFINITE);
-        if (!res)
+        BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &pOverlapped, INFINITE);
+        if (!queued_result)
         {
             //Concurrency issues
             std::cout << "Error dequeing: " << GetLastError() << std::endl;
@@ -31,60 +28,41 @@ DWORD server::WorkerThread(LPVOID param)
             continue;
         }
 
-        //TODO: Implement working on opcodes
-        std::string data;
+        bool op_result = true;
+        ATTACH_RESULT att_result;
         switch (client->op_code)
         {
         case OP_SEND:
             //We have sent something to client, let's see what he responded
-            dwFlags = 0;
-            client->reset_buffer();
-            client->client_message.clear();
-            snd = WSARecv(client->get_socket(), client->get_wsabuff_ptr(), 1, &dwBytes, &dwFlags, client->get_overlapped_ptr(), nullptr);
-
-            if ((SOCKET_ERROR == snd) && (WSA_IO_PENDING != WSAGetLastError()))
+            client->last_message.clear();
+            if (!client->recieve())
             {
-                printf("\nThread: Error occurred while executing WSARecv (%d).", WSAGetLastError());
-
+                printf("\nError occurred while executing WSARecv (%d).", WSAGetLastError());
                 //Let's not work with this client
                 me->g_client_storage.detach_client(client);
                 continue;
             }
-            client->op_code = OP_RECV;
             break;
         case OP_RECV:
             //Client sent to us something
-            data = client->get_buffer_data();
+            att_result = client->attach_bytes_to_message();
 #ifdef _DEBUG
-            std::cout << "Client sent " << data << std::endl;
+            std::cout << "Client sent " << std::string(client->get_buffer_data()) << std::endl;
 #endif
-            client->client_message.append(data);
-            if (data[data.size() - 1] == 3)
+            switch (att_result)
             {
+            case CLIENT_DISCONNECT:
                 me->g_client_storage.detach_client(client);
                 continue;
+            case MESSAGE_INCOMPLETE:
+                op_result = client->recieve();
+                break;
+            case MESSAGE_COMPLETE:
+                op_result = client->send(client->last_message);
             }
-            dwFlags = 0;
-            if (data[data.size() - 1] >= 32 || data[data.size() - 1] == 8 /*backspace. TODO: Improve*/)
+            if (!op_result)
             {
-                //Waiting for control symbol
-                client->reset_buffer();
-                snd = WSARecv(client->get_socket(), client->get_wsabuff_ptr(), 1, &dwBytes, &dwFlags, client->get_overlapped_ptr(), nullptr);
-                client->op_code = OP_RECV;
-            }
-            else
-            {
-                //Respond to him
-                client->reset_buffer();
-                CopyMemory(client->get_buffer_data(), client->client_message.c_str(), client->client_message.length());
-                client->get_wsabuff_ptr()->len = client->client_message.length();
-                snd = WSASend(client->get_socket(), client->get_wsabuff_ptr(), 1, &dwBytes, dwFlags, client->get_overlapped_ptr(), nullptr);
-                client->op_code = OP_SEND;
-            }
-            if ((SOCKET_ERROR == snd) && (WSA_IO_PENDING != WSAGetLastError()))
-            {
-                printf("\nThread: Error occurred while executing WSASend (%d).", WSAGetLastError());
-
+                printf("\nError occurred while executing WSASend (%d).", WSAGetLastError());
                 //Let's not work with this client
                 me->g_client_storage.detach_client(client);
                 continue;

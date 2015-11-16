@@ -14,13 +14,6 @@
 #ifndef CONSTANTS_SERVER
 #define CONSTANTS_SERVER
 
-//Operation codes for clients
-
-#define OP_SEND 1
-//Server sends data to client
-#define OP_RECV 2
-//Server recievs data
-
 //Defaul greetings message. It will be concatinated with user address
 #define STR_GREETINGS "Hello, user "
 #endif
