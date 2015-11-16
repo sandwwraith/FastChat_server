@@ -58,7 +58,12 @@ DWORD server::WorkerThread(LPVOID param)
                 op_result = client->recieve();
                 break;
             case MESSAGE_COMPLETE:
-                op_result = client->send(client->last_message);
+                //Sending to all clients
+                for (auto it = me->g_client_storage.watch_clients().begin(), end = me->g_client_storage.watch_clients().end(); it != end; ++it)
+                {
+                    (*it)->send(client->last_message);
+                    //TODO: mark clients for disconnect if error
+                }
             }
             if (!op_result)
             {

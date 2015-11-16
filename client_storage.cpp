@@ -40,6 +40,11 @@ void client_storage::clear_all()
     LeaveCriticalSection(&cs_clientList);
 }
 
+std::list<Client*> const& client_storage::watch_clients() const
+{
+    return storage;
+}
+
 client_storage::client_storage()
 {
     InitializeCriticalSection(&cs_clientList);

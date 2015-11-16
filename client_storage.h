@@ -12,6 +12,8 @@ public:
     void attach_client(Client*);
     void detach_client(Client*);
     void clear_all();
+
+    std::list<Client*> const& watch_clients() const;
     client_storage();
     ~client_storage();
 };
