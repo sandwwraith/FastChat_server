@@ -5,6 +5,9 @@
 class client_storage
 {
     std::list<Client*> storage;
+
+    //Mutex for working with storage
+    CRITICAL_SECTION cs_clientList;
 public:
     void attach_client(Client*);
     void detach_client(Client*);
