@@ -109,8 +109,12 @@ SOCKET server::create_listen_socket()
     }
 
     sockaddr_in serv_address;
-    serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
-    //serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    if (global_addr)
+        serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
+    else 
+        serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
+
     serv_address.sin_family = AF_INET;
     serv_address.sin_port = htons(g_server_port);
 
@@ -274,6 +278,18 @@ bool server::set_port(int new_port)
 {
     if (g_started) return false;
     g_server_port = new_port;
+    return true;
+}
+
+bool server::is_addr_global() const
+{
+    return global_addr;
+}
+
+bool server::set_global_addr(bool set_to_global)
+{
+    if (g_started) return false;
+    global_addr = set_to_global;
     return true;
 }
 

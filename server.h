@@ -22,13 +22,18 @@
 class server
 {
 private:
-    //Global parameter for server port
+    //Global parameter for server address/port
     int g_server_port = 2539;
+
+    //If true, recieves on INADDR_ANY. localhost otherwise.
+    bool global_addr = false;
 public:
     //Returns true if port was setted (false if server already started)
     bool set_port(int new_port);
     int get_port() const;
 
+    bool is_addr_global() const;
+    bool set_global_addr(bool set_to_global);
 private:
     //Global array of worker threads
     HANDLE* g_worker_threads = nullptr;
