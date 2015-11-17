@@ -1,21 +1,32 @@
 #pragma once
 #include <WinSock2.h>
 #include <string>
+#include<atomic>
 //Maximum buffer size for I/O Operations
 #define MAX_BUFFER_SIZE 256
 
 //Operation codes for clients
-
 #define OP_SEND 1
 //Server sends data to client
 #define OP_RECV 2
 //Server recievs data
 
-//Bytes operation results types
-#define MESSAGE_COMPLETE 0x1
-#define MESSAGE_INCOMPLETE 0x2
-#define CLIENT_DISCONNECT 0x4
-typedef int ATTACH_RESULT;
+//Client statuses
+#define DUMMY -1
+#define STATE_NEW 0
+#define STATE_INIT 1
+#define STATE_QUEUED 2
+#define STATE_MESSAGING 4
+#define STATE_VOTING 8
+#define STATE_FINISHED 16
+
+//Message types
+#define MST_QUEUE 1
+#define MST_MESSAGE 2
+#define MST_TIMEOUT 3
+#define MST_VOTING 4
+#define MST_DISCONNECT 10
+#define MST_LEAVE 69
 
 class Client
 {
@@ -28,12 +39,20 @@ private:
 
     //Socket of client
     SOCKET socket;
-    
+
+    CRITICAL_SECTION cl_sec;
+
+    Client* companion = nullptr;    
 public:
     int op_code;
-    int id;
-    bool new_client;
-    std::string last_message;
+    unsigned long id;
+    int client_status;
+
+    Client* get_companion() const;
+    void set_companion(Client*);
+    void delete_companion();
+    bool has_companion();
+    bool own_companion();
 
     char* get_buffer_data();
     int get_buffer_size() const;
@@ -42,13 +61,19 @@ public:
     void reset_buffer();
     SOCKET get_socket();
 
-   
     //Remember, this will reset your buffer
     bool recieve();
-    bool send(std::string);
+    bool send(std::string const&);
+    void skip_send();
 
-    //Call it when you've received smth. See ATTACH_RESULT for details.
-    ATTACH_RESULT attach_bytes_to_message();
+    bool send_leaved();
+    bool send_bad_vote();
+    bool send_greetings(unsigned int users_online);
+
+    int get_message_type() const;
+
+    void lock();
+    void unlock();
 
     explicit Client(SOCKET s);
     ~Client();

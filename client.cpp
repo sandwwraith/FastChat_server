@@ -3,6 +3,39 @@
 #include <thread>
 
 
+Client* Client::get_companion() const
+{
+    return companion;
+}
+
+void Client::delete_companion()
+{
+    this->lock();
+    companion = (nullptr);
+    this->unlock();
+}
+
+bool Client::own_companion()
+{
+    this->lock();
+    if (this->has_companion())
+    {
+        return true;
+    }
+    this->unlock();
+    return false;
+}
+
+bool Client::has_companion()
+{
+    return companion!=nullptr;
+}
+
+void Client::set_companion(Client* cmp)
+{
+    companion = cmp;
+}
+
 char* Client::get_buffer_data()
 {
     return wsabuf->buf;
@@ -39,7 +72,38 @@ bool Client::recieve()
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
-bool Client::send(std::string message)
+void Client::skip_send()
+{
+    this->reset_buffer();
+    this->op_code = OP_RECV;
+}
+
+bool Client::send_greetings(unsigned int users_online)
+{
+    static_assert(sizeof(int) == 4,"Sizeof(int) doesn't equals 4");
+
+    std::string buf;
+    buf.push_back(42);
+    buf.push_back(users_online >> 24 & 0xFF);
+    buf.push_back(users_online >> 16 & 0xFF);
+    buf.push_back(users_online >> 8 & 0xFF);
+    buf.push_back(users_online & 0xFF);
+    return this->send(buf);
+}
+
+bool Client::send_bad_vote()
+{
+    std::string s = {42, MST_VOTING, 0};
+    return send(s);
+}
+
+bool Client::send_leaved()
+{
+    std::string s = { 42, MST_LEAVE };
+    return send(s);
+}
+
+bool Client::send(std::string const & message)
 {
     std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
     this->reset_buffer();
@@ -53,20 +117,19 @@ bool Client::send(std::string message)
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
-ATTACH_RESULT Client::attach_bytes_to_message()
+void Client::lock()
 {
-    std::string data = this->get_buffer_data();
-    if (data.back() == 8 /*backspace*/) 
-    {
-        last_message.pop_back();
-        return MESSAGE_INCOMPLETE;
-    }
-    if (data.back() == 3 /*disconnect */ )
-    {
-        return CLIENT_DISCONNECT;
-    }
-    last_message.append(data);
-    return data[data.size() - 1] < 32 ? MESSAGE_COMPLETE : MESSAGE_INCOMPLETE;
+    EnterCriticalSection(&cl_sec);
+}
+
+void Client::unlock()
+{
+    LeaveCriticalSection(&cl_sec);
+}
+
+int Client::get_message_type() const
+{
+    return this->wsabuf->buf[1];
 }
 
 SOCKET Client::get_socket()
@@ -76,6 +139,7 @@ SOCKET Client::get_socket()
 
 Client::Client(SOCKET s) : socket(s)
 {
+    client_status = STATE_NEW;
     overlapped = new OVERLAPPED;
     wsabuf = new WSABUF;
 
@@ -83,11 +147,14 @@ Client::Client(SOCKET s) : socket(s)
     ZeroMemory(wsabuf, sizeof(WSABUF));
     wsabuf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
     reset_buffer();
+
+    InitializeCriticalSection(&cl_sec);
 }
 
 Client::~Client()
 {
     std::cout << id << " destroyed\n";
+
     //Wait for the pending operations to complete
     while (!HasOverlappedIoCompleted(overlapped))
     {
@@ -100,4 +167,5 @@ Client::~Client()
     reset_buffer();
     free(wsabuf->buf);
     delete wsabuf;
+    DeleteCriticalSection(&cl_sec);
 }

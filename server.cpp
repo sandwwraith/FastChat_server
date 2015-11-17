@@ -4,7 +4,7 @@
 
 DWORD server::WorkerThread(LPVOID param)
 {
-    server* me = (server*)param;
+    server* me = static_cast<server*>(param);
     void* context = nullptr;
     OVERLAPPED* pOverlapped = nullptr;
     DWORD dwBytesTransfered = 0;
@@ -14,7 +14,6 @@ DWORD server::WorkerThread(LPVOID param)
         BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &pOverlapped, INFINITE);
         if (!queued_result)
         {
-            //Concurrency issues
             std::cout << "Error dequeing: " << GetLastError() << std::endl;
             continue;
         }
@@ -23,79 +22,253 @@ DWORD server::WorkerThread(LPVOID param)
             return 0;
         }
         Client* client = static_cast<Client*>(context);
-        if (dwBytesTransfered == 0) //Client dropped connection
+        if (client->client_status == DUMMY)
         {
-            std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
-            me->g_client_storage.detach_client(client);
-            continue;
-        }
+            if (me->lastAccepted != nullptr) {
+                std::cout << "Accept successfull, id:" << me->lastAccepted->id << std::endl;
 
-        bool op_result = true;
-        ATTACH_RESULT att_result;
-        switch (client->op_code)
-        {
-        case OP_SEND:
-            //We have sent something to client, let's see what he responded
-            std::cout << client->id << " send dequeued (#" << std::this_thread::get_id() << std::endl;
-            
-            if (client->new_client)
-            {
-                if (!client->recieve())
+               int res = setsockopt(me->lastAccepted->get_socket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+                    (char*)&(me->listenSock), sizeof(me->listenSock));
+                if (res == SOCKET_ERROR)
                 {
-                    std::cout << "Error occurred while executing WSARecv: " << WSAGetLastError() << std::endl;
-                    //Let's not work with this client
-                    me->g_client_storage.detach_client(client);
-                    break;
+                    std::cout << "Set sock opt failed: " << WSAGetLastError() << std::endl;
                 }
-                client->new_client = false;
+
+                me->g_client_storage.attach_client(me->lastAccepted);
+                if (!me->lastAccepted->send_greetings(me->g_client_storage.clients_count()))
+                {
+                    std::cout << "Error in inital send, drop client " << me->lastAccepted->id << std::endl;
+                    me->g_client_storage.detach_client(me->lastAccepted);
+                }
+                me->lastAccepted = nullptr;
+                me->accept();
             }
             else
             {
-                client->reset_buffer(); //Какой-то хуёвый костыль.
-                client->op_code = OP_RECV;
+                std::cout << "WTF\n";
             }
-            break;
-        case OP_RECV:
-            //Client sent to us something
-            att_result = client->attach_bytes_to_message();
-#ifdef _DEBUG
-            std::cout << client->id << " Client dequeued \"" << std::string(client->get_buffer_data()) << "\"(#" << std::this_thread::get_id() << std::endl;
-#endif
-            switch (att_result)
-            {
-            case CLIENT_DISCONNECT:
-                me->g_client_storage.detach_client(client);
-                continue;
-            case MESSAGE_INCOMPLETE:
-                op_result = client->recieve();
-                break;
-            case MESSAGE_COMPLETE:
-                //Sending to all clients
-                std::string msg = client->last_message; //I'VE SEARCHED THIS BUG 
-                //FOR NEARLY THREE FUCKING HOURS
-                for (auto it = me->g_client_storage.watch_clients().begin(), end = me->g_client_storage.watch_clients().end(); it != end; ++it)
-                {
-                    if (*it == client) continue;
-                    (*it)->send(msg);
-                    //TODO: mark clients for disconnect if error
-                }
-                client->last_message.clear();
-                client->recieve();
-            }
-
-            if (!op_result)
-            {
-                std::cout << "Error occurred while executing WSASend: " << WSAGetLastError() << std::endl;
-                //Let's not work with this client
-                me->g_client_storage.detach_client(client);
-                continue;
-            }
-            break;
-        default:
-            std::cout << "Error: undefined opcode\n";
             continue;
         }
+        if (dwBytesTransfered == 0) //Client dropped connection
+        {
+            std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
+            if (client->has_companion()) client->get_companion()->delete_companion();
+            me->g_client_storage.detach_client(client); //TODO: Delete from queue
+            continue;
+        }
+
+        switch (client->client_status)
+        {
+        case STATE_NEW:
+            //This client has just received greetings. Therefore, this operation can be only SEND
+            //Switch client to receive to get QUEUE request
+            client->client_status = STATE_INIT;
+            if (!client->recieve())
+            {
+                std::cout << "Error occurred while executing WSARecv: " << WSAGetLastError() << std::endl;
+                //Let's not work with this client
+                me->g_client_storage.detach_client(client);
+                break;
+            }
+
+            break;
+        case STATE_INIT:
+            //In this state, client may ask to queue him (OP_RECV) or to get pair (OP_SEND)
+            if (client->op_code == OP_RECV)
+            {
+                if (client->get_message_type() == MST_DISCONNECT)
+                {
+                    std::cout << client->id << " send disconnect" << std::endl;
+                    me->g_client_storage.detach_client(client);
+                    break;
+                }
+                if (client->get_message_type() != MST_QUEUE)
+                {
+                    client->recieve(); // If you ignore it, maybe it will go away
+                }
+
+                //Making a pair for our client
+                if (me->g_client_queue.size() >= 1)
+                {
+                    me->g_client_queue.make_pair(client);
+                    //Send them info
+                    std::string msg1(client->get_buffer_data(), dwBytesTransfered);
+                    std::string msg2(client->get_companion()->get_buffer_data(), dwBytesTransfered);
+                    client->send(msg2);
+                    client->get_companion()->send(msg1); //TODO: rework this also to own_companion
+                }
+                else
+                {
+                    //Enqueue user
+                    me->g_client_queue.push(client);
+                }
+            }
+            else
+            {
+                //Clients has received their themes and started messaging
+                //Change only one client, 'cause we'll got two SEND complete statuses
+                if (client->get_message_type() == MST_QUEUE)
+                {
+                    client->client_status = STATE_MESSAGING;
+                    client->recieve();
+                }
+                else
+                {
+                    client->skip_send();
+                }
+            }
+            break;
+        case STATE_MESSAGING:
+            //Client just sending and receiving
+
+            if (client->op_code == OP_RECV)
+            {
+                //We have received smth, let's send it to another client
+                std::string msg(client->get_buffer_data(), dwBytesTransfered);
+                std::cout << client->id << " messaged " << msg << std::endl;
+
+                //Change state if msg timeout or leave
+                if (client->get_message_type() == MST_TIMEOUT)
+                    client->client_status = STATE_VOTING;
+                if (client->get_message_type() == MST_LEAVE)
+                    client->client_status = STATE_INIT;
+                if (client->get_message_type() == MST_DISCONNECT)
+                {
+                    std::cout << client->id << " send disconnect" << std::endl;
+                    if (client->has_companion()) client->get_companion()->delete_companion();
+                    me->g_client_storage.detach_client(client);
+                    break;
+                }
+                if (client->own_companion())
+                {
+                    if (client->get_companion()->client_status == STATE_MESSAGING)
+                        client->get_companion()->send(msg);
+                    client->unlock();
+                }
+                else
+                {
+                    //Handling UNEXPECTEDLY leave
+                    client->send_leaved();
+                }
+
+                client->recieve();
+            }
+            else
+            {
+                // This client is already on receive, just got the message from companion
+                if (client->get_message_type() == MST_TIMEOUT)
+                    client->client_status = STATE_VOTING;
+                if (client->get_message_type() == MST_LEAVE)
+                    client->client_status = STATE_INIT;
+                client->skip_send();
+                //Too easy. Look suspicious...
+            }
+            break;
+        case STATE_VOTING:
+            //In this state, clients are only allowed to send or receive one message with results
+
+            if (client->op_code == OP_RECV)
+            {
+                std::string msg(client->get_buffer_data(), dwBytesTransfered);
+                std::cout << client->id << " voted " << msg << std::endl;
+                if (client->own_companion())
+                {
+                    client->get_companion()->send(msg);
+                    client->unlock();
+                }
+                else
+                {
+                    client->client_status = STATE_FINISHED;
+                    client->send_bad_vote();
+                    break;
+                }
+
+                client->client_status = STATE_FINISHED;
+            }
+            else
+            {
+                //If this client received, but didn't voted itself
+                client->skip_send();
+
+                client->client_status = STATE_FINISHED;
+            }
+
+            break;
+        case STATE_FINISHED:
+            //In this state, client who send first, received pair message and resets
+            //Client who send second delivers his message to first and also resets
+
+            if (client->op_code == OP_RECV)
+            {
+                std::string msg(client->get_buffer_data(), dwBytesTransfered);
+                std::cout << client->id << " voted " << msg << std::endl;
+                if (client->own_companion())
+                {
+                    client->get_companion()->send(msg);
+                    client->unlock();
+                }
+                else
+                {
+                    //.... nothing to do, actually.
+                }
+            }
+
+            //Client may want to find another pair
+            client->set_companion(nullptr);
+            client->client_status = STATE_INIT;
+            client->recieve();
+
+            break;
+        }
     }
+}
+
+bool server::accept()
+{
+    GUID GuidAcceptEx = WSAID_ACCEPTEX;
+    LPFN_ACCEPTEX lpfnAcceptEx = NULL;
+    DWORD dwBytes;
+    //The most amazing function i've ever seen. 
+    int res = WSAIoctl(listenSock, SIO_GET_EXTENSION_FUNCTION_POINTER
+        , &GuidAcceptEx, sizeof(GuidAcceptEx), &lpfnAcceptEx, sizeof(lpfnAcceptEx)
+        , &dwBytes, nullptr, nullptr);
+
+    if (res == SOCKET_ERROR)
+    {
+        std::cout << "Can't get pointer: " << WSAGetLastError() << std::endl;
+        return false;
+    }
+
+    SOCKET acc_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
+    if (acc_socket == INVALID_SOCKET)
+    {
+        std::cout << "Can't create listen socket: " << WSAGetLastError() << std::endl;
+        return false;
+    }
+
+    OVERLAPPED ovrl;
+    ZeroMemory(&ovrl, sizeof(OVERLAPPED));
+    char buf[sizeof(sockaddr_in) * 2 + 32];
+
+    BOOL b = lpfnAcceptEx(listenSock, acc_socket
+        , buf, 0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16
+        , &dwBytes, &ovrl);
+
+    if (!b && WSAGetLastError() != WSA_IO_PENDING) {
+        std::cout << "AcceptEx failed: " << WSAGetLastError() << std::endl;
+        return false;
+    }
+
+    Client* cl = new Client(acc_socket);
+    cl->id = ids++;
+    HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)cl, 0);
+    if (port == NULL)
+    {
+        std::cout << "Can't bind nwe client to comp port: " << GetLastError() << std::endl;
+        return false;
+    }
+    this->lastAccepted = cl;
+    return true;
 }
 
 SOCKET server::create_listen_socket()
@@ -109,8 +282,12 @@ SOCKET server::create_listen_socket()
     }
 
     sockaddr_in serv_address;
-    serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
-    //serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    if (global_addr)
+        serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
+    else 
+        serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
+
     serv_address.sin_family = AF_INET;
     serv_address.sin_port = htons(g_server_port);
 
@@ -128,6 +305,11 @@ SOCKET server::create_listen_socket()
         return INVALID_SOCKET;
     }
     return sock;
+}
+
+unsigned server::clients_count() const
+{
+    return g_client_storage.clients_count();
 }
 
 int server::get_proc_count()
@@ -162,8 +344,12 @@ bool server::init()
     }
 
     //Creating threads
-    //g_workers_count = g_worker_threads_per_processor * get_proc_count();
+#ifndef _DEBUG
+    g_workers_count = g_worker_threads_per_processor * get_proc_count();
+#else
     g_workers_count = 2;
+#endif
+
     std::cout << "Threads count: " << g_workers_count << std::endl;
     g_worker_threads = new HANDLE[g_workers_count];
 
@@ -175,68 +361,27 @@ bool server::init()
     return true;
 }
 
-int server::main_cycle()
+int server::start()
 {
     if (!g_started && !init())
     {
         std::cout << "Failed to init\n";
         return 1;
     }
-    SOCKET sock = create_listen_socket();
-    if (sock == INVALID_SOCKET)
+    listenSock = create_listen_socket();
+    if (listenSock == INVALID_SOCKET)
     {
         std::cout << "Failed to create listen socket\n";
         shutdown();
         return 1;
     }
-    //Switching socket to non-blocking mode (to perform operations on main thread)
-    unsigned long anb = 1;
-    ioctlsocket(sock, FIONBIO, &anb);
+
+    Client* dummy = new Client(INVALID_SOCKET);
+    dummy->client_status = DUMMY;
+    CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)dummy, 0);
+    this->accept();
 
     std::cout << "All OK, waiting for the connections" << std::endl;
-    std::cout << "Press any key to exit" << std::endl;
-
-    int count = 0;
-    while (!_kbhit()) {
-
-        //Accepting new client
-
-        sockaddr_in client_address;
-        int cl_length = sizeof(client_address);
-        SOCKET accepted = WSAAccept(sock, reinterpret_cast<sockaddr*>(&client_address), &cl_length, nullptr, 0);
-        if (accepted == INVALID_SOCKET)
-        {
-            if (WSAGetLastError() != WSAEWOULDBLOCK)
-                printf("Accept failed with error: %d\n", WSAGetLastError());
-            continue;
-        }
-
-        std::string client_name = inet_ntoa(client_address.sin_addr);
-        std::cout << "Connected: " << client_name << std::endl;
-        Client* client = new Client(accepted);
-        client->id = count++;
-        client->new_client = true;
-        g_client_storage.attach_client(client);
-
-        //Associating client with IOCP
-        if (CreateIoCompletionPort((HANDLE)client->get_socket(), g_io_completion_port, (ULONG_PTR)client, 0) == nullptr)
-        {
-            std::cout << "Error linking client to completion port\n";
-            g_client_storage.detach_client(client);
-            continue;
-        }
-
-        //Sending greetings
-        std::string greetings = STR_GREETINGS + client_name + "!\r\n";
-
-        if (!client->send(greetings))
-        {
-            printf("\nError in Initial send. %d\n", WSAGetLastError());
-            g_client_storage.detach_client(client);
-            continue;
-        }
-    }
-    shutdown();
     return 0;
 }
 
@@ -274,6 +419,18 @@ bool server::set_port(int new_port)
 {
     if (g_started) return false;
     g_server_port = new_port;
+    return true;
+}
+
+bool server::is_addr_global() const
+{
+    return global_addr;
+}
+
+bool server::set_global_addr(bool set_to_global)
+{
+    if (g_started) return false;
+    global_addr = set_to_global;
     return true;
 }
 

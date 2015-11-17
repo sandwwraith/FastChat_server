@@ -1,10 +1,10 @@
 #pragma once
 #include "client.h"
-#include <list>
+#include <vector>
 
 class client_storage
 {
-    std::list<Client*> storage;
+    std::vector<Client*> storage;
 
     //Mutex for working with storage
     CRITICAL_SECTION cs_clientList;
@@ -13,7 +13,8 @@ public:
     void detach_client(Client*);
     void clear_all();
 
-    std::list<Client*> const& watch_clients() const;
+    std::vector<Client*> const& watch_clients() const;
+    unsigned int clients_count() const;
     client_storage();
     ~client_storage();
 };
