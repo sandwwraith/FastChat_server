@@ -32,6 +32,7 @@ private:
 public:
     int op_code;
     int id;
+    bool new_client;
     std::string last_message;
 
     char* get_buffer_data();

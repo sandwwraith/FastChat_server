@@ -25,9 +25,9 @@ DWORD server::WorkerThread(LPVOID param)
         Client* client = static_cast<Client*>(context);
         if (dwBytesTransfered == 0) //Client dropped connection
         {
-            std::cout << client->id << " Zero bytes transfered (#" << std::this_thread::get_id() << std::endl;
-            //me->g_client_storage.detach_client(client);
-            //continue;
+            std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
+            me->g_client_storage.detach_client(client);
+            continue;
         }
 
         bool op_result = true;
@@ -36,14 +36,23 @@ DWORD server::WorkerThread(LPVOID param)
         {
         case OP_SEND:
             //We have sent something to client, let's see what he responded
-            client->last_message.clear();
             std::cout << client->id << " send dequeued (#" << std::this_thread::get_id() << std::endl;
-            if (!client->recieve())
+            
+            if (client->new_client)
             {
-                std::cout<<"Error occurred while executing WSARecv: "<< WSAGetLastError() << std::endl;
-                //Let's not work with this client
-                me->g_client_storage.detach_client(client);
-                continue;
+                if (!client->recieve())
+                {
+                    std::cout << "Error occurred while executing WSARecv: " << WSAGetLastError() << std::endl;
+                    //Let's not work with this client
+                    me->g_client_storage.detach_client(client);
+                    break;
+                }
+                client->new_client = false;
+            }
+            else
+            {
+                client->reset_buffer(); //Какой-то хуёвый костыль.
+                client->op_code = OP_RECV;
             }
             break;
         case OP_RECV:
@@ -66,10 +75,14 @@ DWORD server::WorkerThread(LPVOID param)
                 //FOR NEARLY THREE FUCKING HOURS
                 for (auto it = me->g_client_storage.watch_clients().begin(), end = me->g_client_storage.watch_clients().end(); it != end; ++it)
                 {
+                    if (*it == client) continue;
                     (*it)->send(msg);
                     //TODO: mark clients for disconnect if error
                 }
+                client->last_message.clear();
+                client->recieve();
             }
+
             if (!op_result)
             {
                 std::cout << "Error occurred while executing WSASend: " << WSAGetLastError() << std::endl;
@@ -96,8 +109,8 @@ SOCKET server::create_listen_socket()
     }
 
     sockaddr_in serv_address;
-    //serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
-    serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
+    serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
+    //serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
     serv_address.sin_family = AF_INET;
     serv_address.sin_port = htons(g_server_port);
 
@@ -202,6 +215,7 @@ int server::main_cycle()
         std::cout << "Connected: " << client_name << std::endl;
         Client* client = new Client(accepted);
         client->id = count++;
+        client->new_client = true;
         g_client_storage.attach_client(client);
 
         //Associating client with IOCP
