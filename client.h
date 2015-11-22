@@ -5,11 +5,18 @@
 #define MAX_BUFFER_SIZE 256
 
 //Operation codes for clients
-
 #define OP_SEND 1
 //Server sends data to client
 #define OP_RECV 2
 //Server recievs data
+
+//Client statuses
+#define STATE_NEW 0
+#define STATE_INIT 1
+#define STATE_QUEUED 2
+#define STATE_MESSAGING 4
+#define STATE_VOTING 8
+#define STATE_FINISHED 16
 
 //Bytes operation results types
 #define MESSAGE_COMPLETE 0x1
@@ -32,8 +39,10 @@ private:
 public:
     int op_code;
     int id;
-    bool new_client;
+    int client_status;
     std::string last_message;
+
+    Client* companion = nullptr;
 
     char* get_buffer_data();
     int get_buffer_size() const;
@@ -42,7 +51,7 @@ public:
     void reset_buffer();
     SOCKET get_socket();
 
-   
+    bool send_current_buffer();
     //Remember, this will reset your buffer
     bool recieve();
     bool send(std::string);

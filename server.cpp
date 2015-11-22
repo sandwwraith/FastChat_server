@@ -30,70 +30,57 @@ DWORD server::WorkerThread(LPVOID param)
             continue;
         }
 
-        bool op_result = true;
-        ATTACH_RESULT att_result;
-        switch (client->op_code)
+        switch (client->client_status)
         {
-        case OP_SEND:
-            //We have sent something to client, let's see what he responded
-            std::cout << client->id << " send dequeued (#" << std::this_thread::get_id() << std::endl;
-            
-            if (client->new_client)
+        case STATE_NEW:
+            //This client has just received greetings. Therefore, this operation can be only SEND
+            //Switch client to receive to get QUEUE request
+            client->client_status = STATE_INIT;
+            if (!client->recieve())
             {
-                if (!client->recieve())
+                std::cout << "Error occurred while executing WSARecv: " << WSAGetLastError() << std::endl;
+                //Let's not work with this client
+                me->g_client_storage.detach_client(client);
+                break;
+            }
+            
+            break;
+        case STATE_INIT:
+            //In this state, client may ask to queue him (OP_RECV) or to get pair (OP_SEND)
+            if (client->op_code == OP_RECV)
+            {
+                //Making a pair for our client
+                if (me->g_client_queue.size() >= 1)
                 {
-                    std::cout << "Error occurred while executing WSARecv: " << WSAGetLastError() << std::endl;
-                    //Let's not work with this client
-                    me->g_client_storage.detach_client(client);
-                    break;
+                    me->g_client_queue.make_pair(client);
+                    //Send them info
+                    client->send_current_buffer();
+                    client->companion->send_current_buffer();
                 }
-                client->new_client = false;
+                else
+                {
+                    //Enqueue user
+                    me->g_client_queue.push(client);
+                }
             }
             else
             {
-                client->reset_buffer(); //Какой-то хуёвый костыль.
-                client->op_code = OP_RECV;
-            }
-            break;
-        case OP_RECV:
-            //Client sent to us something
-            att_result = client->attach_bytes_to_message();
-#ifdef _DEBUG
-            std::cout << client->id << " Client dequeued \"" << std::string(client->get_buffer_data()) << "\"(#" << std::this_thread::get_id() << std::endl;
-#endif
-            switch (att_result)
-            {
-            case CLIENT_DISCONNECT:
-                me->g_client_storage.detach_client(client);
-                continue;
-            case MESSAGE_INCOMPLETE:
-                op_result = client->recieve();
-                break;
-            case MESSAGE_COMPLETE:
-                //Sending to all clients
-                std::string msg = client->last_message; //I'VE SEARCHED THIS BUG 
-                //FOR NEARLY THREE FUCKING HOURS
-                for (auto it = me->g_client_storage.watch_clients().begin(), end = me->g_client_storage.watch_clients().end(); it != end; ++it)
-                {
-                    if (*it == client) continue;
-                    (*it)->send(msg);
-                    //TODO: mark clients for disconnect if error
-                }
-                client->last_message.clear();
+                //Clients has received their themes and started messaging
+                //Change only one client, 'cause we'll got two SEND complete statuses
+                client->client_status = STATE_MESSAGING;
                 client->recieve();
             }
-
-            if (!op_result)
+            break;
+        case STATE_MESSAGING:
+            //Client just sending and receiving
+            //TODO: Implement timeout
+            if (client->op_code == OP_RECV)
             {
-                std::cout << "Error occurred while executing WSASend: " << WSAGetLastError() << std::endl;
-                //Let's not work with this client
-                me->g_client_storage.detach_client(client);
-                continue;
+                //We have received smth, let's send it to another client
+
+                //code code....
             }
             break;
-        default:
-            std::cout << "Error: undefined opcode\n";
-            continue;
         }
     }
 }
@@ -219,7 +206,6 @@ int server::main_cycle()
         std::cout << "Connected: " << client_name << std::endl;
         Client* client = new Client(accepted);
         client->id = count++;
-        client->new_client = true;
         g_client_storage.attach_client(client);
 
         //Associating client with IOCP

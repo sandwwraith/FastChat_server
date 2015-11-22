@@ -6,6 +6,7 @@
 #include <iostream>
 #include <conio.h>
 
+#include "client_queue.h"
 #include "client.h"
 #include "client_storage.h"
 
@@ -55,6 +56,7 @@ private:
     HANDLE g_io_completion_port;
 
     //Global storage for all clients
+    client_queue g_client_queue;
     client_storage g_client_storage;
 
     static DWORD WINAPI WorkerThread(LPVOID); //Worker function for threads

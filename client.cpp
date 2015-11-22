@@ -74,8 +74,19 @@ SOCKET Client::get_socket()
     return socket;
 }
 
+bool Client::send_current_buffer()
+{
+    std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
+    DWORD dwBytes = 0;
+    DWORD dwFlags = 0;
+    op_code = OP_SEND;
+    auto snd = WSASend(this->socket, this->wsabuf, 1, &dwBytes, dwFlags, overlapped, nullptr);
+    return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
+}
+
 Client::Client(SOCKET s) : socket(s)
 {
+    client_status = STATE_NEW;
     overlapped = new OVERLAPPED;
     wsabuf = new WSABUF;
 
