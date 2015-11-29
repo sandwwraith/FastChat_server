@@ -5,7 +5,7 @@
 #include "client.h"
 class client_queue
 {
-    std::default_random_engine generator;
+    std::default_random_engine generator; //TODO: Make real random
     std::uniform_int_distribution<int> distribution = std::uniform_int_distribution<int>(1, 50); 
 
     CRITICAL_SECTION sec;
