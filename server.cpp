@@ -54,8 +54,10 @@ DWORD server::WorkerThread(LPVOID param)
                 {
                     me->g_client_queue.make_pair(client);
                     //Send them info
-                    client->send_current_buffer();
-                    client->companion->send_current_buffer();
+                    std::string msg1(client->get_buffer_data(),dwBytesTransfered);
+                    std::string msg2(client->companion->get_buffer_data(),dwBytesTransfered);
+                    client->send(msg2);
+                    client->companion->send(msg1);
                 }
                 else
                 {
@@ -77,8 +79,18 @@ DWORD server::WorkerThread(LPVOID param)
             if (client->op_code == OP_RECV)
             {
                 //We have received smth, let's send it to another client
-
+                std::string msg(client->get_buffer_data(), dwBytesTransfered);
+                std::cout << client->id << " dequed " << msg << std::endl;
+                //Change state if msg timeout or disconnect
+                client->companion->send(msg);
+                client->recieve();
                 //code code....
+            } else
+            {
+                // This client is already on receive, just got the message from companion
+                client->reset_buffer();
+                client->op_code = OP_RECV;
+                //Too easy. Look suspicious...
             }
             break;
         }

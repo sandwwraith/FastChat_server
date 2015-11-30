@@ -39,7 +39,7 @@ bool Client::recieve()
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
-bool Client::send(std::string message)
+bool Client::send(std::string const & message)
 {
     std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
     this->reset_buffer();
@@ -74,13 +74,13 @@ SOCKET Client::get_socket()
     return socket;
 }
 
-bool Client::send_current_buffer()
+bool Client::send_companion_buffer()
 {
     std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
     DWORD dwBytes = 0;
     DWORD dwFlags = 0;
     op_code = OP_SEND;
-    auto snd = WSASend(this->socket, this->wsabuf, 1, &dwBytes, dwFlags, overlapped, nullptr);
+    auto snd = WSASend(this->socket, companion->wsabuf, 1, &dwBytes, dwFlags, overlapped, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 

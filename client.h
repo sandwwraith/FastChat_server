@@ -51,10 +51,10 @@ public:
     void reset_buffer();
     SOCKET get_socket();
 
-    bool send_current_buffer();
+    bool send_companion_buffer();
     //Remember, this will reset your buffer
     bool recieve();
-    bool send(std::string);
+    bool send(std::string const&);
 
     //Call it when you've received smth. See ATTACH_RESULT for details.
     ATTACH_RESULT attach_bytes_to_message();
