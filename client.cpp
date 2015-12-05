@@ -53,20 +53,9 @@ bool Client::send(std::string const & message)
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
-ATTACH_RESULT Client::attach_bytes_to_message()
+int Client::get_message_type() const
 {
-    std::string data = this->get_buffer_data();
-    if (data.back() == 8 /*backspace*/) 
-    {
-        last_message.pop_back();
-        return MESSAGE_INCOMPLETE;
-    }
-    if (data.back() == 3 /*disconnect */ )
-    {
-        return CLIENT_DISCONNECT;
-    }
-    last_message.append(data);
-    return data[data.size() - 1] < 32 ? MESSAGE_COMPLETE : MESSAGE_INCOMPLETE;
+    return this->wsabuf->buf[1];
 }
 
 SOCKET Client::get_socket()

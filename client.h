@@ -18,11 +18,13 @@
 #define STATE_VOTING 8
 #define STATE_FINISHED 16
 
-//Bytes operation results types
-#define MESSAGE_COMPLETE 0x1
-#define MESSAGE_INCOMPLETE 0x2
-#define CLIENT_DISCONNECT 0x4
-typedef int ATTACH_RESULT;
+//Message types
+#define MST_QUEUE 1
+#define MST_MESSAGE 2
+#define MST_TIMEOUT 3
+#define MST_VOTING 4
+#define MST_DISCONNECT 10
+#define MST_LEAVE 69
 
 class Client
 {
@@ -40,7 +42,6 @@ public:
     int op_code;
     int id;
     int client_status;
-    std::string last_message;
 
     Client* companion = nullptr;
 
@@ -56,8 +57,7 @@ public:
     bool recieve();
     bool send(std::string const&);
 
-    //Call it when you've received smth. See ATTACH_RESULT for details.
-    ATTACH_RESULT attach_bytes_to_message();
+    int get_message_type() const;
 
     explicit Client(SOCKET s);
     ~Client();
