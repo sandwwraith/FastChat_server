@@ -3,6 +3,39 @@
 #include <thread>
 
 
+Client* Client::get_companion() const
+{
+    return companion;
+}
+
+void Client::delete_companion()
+{
+    this->lock();
+    companion = (nullptr);
+    this->unlock();
+}
+
+bool Client::own_companion()
+{
+    this->lock();
+    if (this->has_companion())
+    {
+        return true;
+    }
+    this->unlock();
+    return false;
+}
+
+bool Client::has_companion()
+{
+    return companion!=nullptr;
+}
+
+void Client::set_companion(Client* cmp)
+{
+    companion = cmp;
+}
+
 char* Client::get_buffer_data()
 {
     return wsabuf->buf;
@@ -39,6 +72,24 @@ bool Client::recieve()
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
+void Client::skip_send()
+{
+    this->reset_buffer();
+    this->op_code = OP_RECV;
+}
+
+bool Client::send_bad_vote()
+{
+    std::string s = {42, MST_VOTING, 0};
+    return send(s);
+}
+
+bool Client::send_leaved()
+{
+    std::string s = { 42, MST_LEAVE };
+    return send(s);
+}
+
 bool Client::send(std::string const & message)
 {
     std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
@@ -53,6 +104,16 @@ bool Client::send(std::string const & message)
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
+void Client::lock()
+{
+    EnterCriticalSection(&cl_sec);
+}
+
+void Client::unlock()
+{
+    LeaveCriticalSection(&cl_sec);
+}
+
 int Client::get_message_type() const
 {
     return this->wsabuf->buf[1];
@@ -61,16 +122,6 @@ int Client::get_message_type() const
 SOCKET Client::get_socket()
 {
     return socket;
-}
-
-bool Client::send_companion_buffer()
-{
-    std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
-    DWORD dwBytes = 0;
-    DWORD dwFlags = 0;
-    op_code = OP_SEND;
-    auto snd = WSASend(this->socket, companion->wsabuf, 1, &dwBytes, dwFlags, overlapped, nullptr);
-    return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
 Client::Client(SOCKET s) : socket(s)
@@ -83,11 +134,14 @@ Client::Client(SOCKET s) : socket(s)
     ZeroMemory(wsabuf, sizeof(WSABUF));
     wsabuf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
     reset_buffer();
+
+    InitializeCriticalSection(&cl_sec);
 }
 
 Client::~Client()
 {
     std::cout << id << " destroyed\n";
+
     //Wait for the pending operations to complete
     while (!HasOverlappedIoCompleted(overlapped))
     {
@@ -100,4 +154,5 @@ Client::~Client()
     reset_buffer();
     free(wsabuf->buf);
     delete wsabuf;
+    DeleteCriticalSection(&cl_sec);
 }

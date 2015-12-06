@@ -1,6 +1,7 @@
 #pragma once
 #include <WinSock2.h>
 #include <string>
+#include<atomic>
 //Maximum buffer size for I/O Operations
 #define MAX_BUFFER_SIZE 256
 
@@ -37,13 +38,20 @@ private:
 
     //Socket of client
     SOCKET socket;
-    
+
+    CRITICAL_SECTION cl_sec;
+
+    Client* companion = nullptr;    
 public:
     int op_code;
     int id;
     int client_status;
 
-    Client* companion = nullptr;
+    Client* get_companion() const;
+    void set_companion(Client*);
+    void delete_companion();
+    bool has_companion();
+    bool own_companion();
 
     char* get_buffer_data();
     int get_buffer_size() const;
@@ -52,12 +60,18 @@ public:
     void reset_buffer();
     SOCKET get_socket();
 
-    bool send_companion_buffer();
     //Remember, this will reset your buffer
     bool recieve();
     bool send(std::string const&);
+    void skip_send();
+
+    bool send_leaved();
+    bool send_bad_vote();
 
     int get_message_type() const;
+
+    void lock();
+    void unlock();
 
     explicit Client(SOCKET s);
     ~Client();

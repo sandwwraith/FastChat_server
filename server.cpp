@@ -26,7 +26,8 @@ DWORD server::WorkerThread(LPVOID param)
         if (dwBytesTransfered == 0) //Client dropped connection
         {
             std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
-            me->g_client_storage.detach_client(client);
+            if (client->has_companion()) client->get_companion()->delete_companion();
+            me->g_client_storage.detach_client(client); //TODO: Delete from queue
             continue;
         }
 
@@ -50,15 +51,26 @@ DWORD server::WorkerThread(LPVOID param)
             //In this state, client may ask to queue him (OP_RECV) or to get pair (OP_SEND)
             if (client->op_code == OP_RECV)
             {
+                if (client->get_message_type() == MST_DISCONNECT)
+                {
+                    std::cout << client->id << " send disconnect" << std::endl;
+                    me->g_client_storage.detach_client(client);
+                    break;
+                }
+                if (client->get_message_type() != MST_QUEUE)
+                {
+                    client->recieve(); // If you ignore it, maybe it will go away
+                }
+
                 //Making a pair for our client
                 if (me->g_client_queue.size() >= 1)
                 {
                     me->g_client_queue.make_pair(client);
                     //Send them info
                     std::string msg1(client->get_buffer_data(), dwBytesTransfered);
-                    std::string msg2(client->companion->get_buffer_data(), dwBytesTransfered);
+                    std::string msg2(client->get_companion()->get_buffer_data(), dwBytesTransfered);
                     client->send(msg2);
-                    client->companion->send(msg1);
+                    client->get_companion()->send(msg1); //TODO: rework this also to own_companion
                 }
                 else
                 {
@@ -70,8 +82,15 @@ DWORD server::WorkerThread(LPVOID param)
             {
                 //Clients has received their themes and started messaging
                 //Change only one client, 'cause we'll got two SEND complete statuses
-                client->client_status = STATE_MESSAGING;
-                client->recieve();
+                if (client->get_message_type() == MST_QUEUE)
+                {
+                    client->client_status = STATE_MESSAGING;
+                    client->recieve();
+                }
+                else
+                {
+                    client->skip_send();
+                }
             }
             break;
         case STATE_MESSAGING:
@@ -81,13 +100,26 @@ DWORD server::WorkerThread(LPVOID param)
             {
                 //We have received smth, let's send it to another client
                 std::string msg(client->get_buffer_data(), dwBytesTransfered);
-                std::cout << client->id << " dequed " << msg << std::endl;
+                std::cout << client->id << " messaged " << msg << std::endl;
 
-                //Change state if msg timeout or disconnect
+                //Change state if msg timeout or leave
                 if (client->get_message_type() == MST_TIMEOUT)
                     client->client_status = STATE_VOTING;
-                if (client->companion->client_status == STATE_MESSAGING) //Concurrency... ?
-                    client->companion->send(msg);
+                if (client->get_message_type() == MST_LEAVE)
+                    client->client_status = STATE_INIT;
+
+                if (client->own_companion())
+                {
+                    if (client->get_companion()->client_status == STATE_MESSAGING)
+                        client->get_companion()->send(msg);
+                    client->unlock();
+                }
+                else
+                {
+                    //Handling UNEXPECTEDLY leave
+                    client->send_leaved();
+                }
+
                 client->recieve();
             }
             else
@@ -95,8 +127,9 @@ DWORD server::WorkerThread(LPVOID param)
                 // This client is already on receive, just got the message from companion
                 if (client->get_message_type() == MST_TIMEOUT)
                     client->client_status = STATE_VOTING;
-                client->reset_buffer();
-                client->op_code = OP_RECV;
+                if (client->get_message_type() == MST_LEAVE)
+                    client->client_status = STATE_INIT;
+                client->skip_send();
                 //Too easy. Look suspicious...
             }
             break;
@@ -107,15 +140,22 @@ DWORD server::WorkerThread(LPVOID param)
             {
                 std::string msg(client->get_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " voted " << msg << std::endl;
-                client->companion->send(msg);
+                if (client->own_companion())
+                {
+                    client->get_companion()->send(msg);
+                    client->unlock();
+                }
+                else
+                {
+                    client->send_bad_vote();
+                }
 
                 client->client_status = STATE_FINISHED;
             }
             else
             {
                 //If this client received, but didn't voted itself
-                client->reset_buffer();
-                client->op_code = OP_RECV;
+                client->skip_send();
 
                 client->client_status = STATE_FINISHED;
             }
@@ -129,11 +169,19 @@ DWORD server::WorkerThread(LPVOID param)
             {
                 std::string msg(client->get_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " voted " << msg << std::endl;
-                client->companion->send(msg);
+                if (client->own_companion())
+                {
+                    client->get_companion()->send(msg);
+                    client->unlock();
+                }
+                else
+                {
+                    //.... nothing to do, actually.
+                }
             }
 
             //Client may want to find another pair
-            client->companion = nullptr;
+            client->set_companion(nullptr);
             client->client_status = STATE_INIT;
             client->recieve();
 

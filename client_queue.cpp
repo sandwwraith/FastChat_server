@@ -30,8 +30,8 @@ Client* client_queue::pop()
 void client_queue::make_pair(Client* cl)
 {
     Client* pair = this->pop();
-    pair->companion = cl;
-    cl->companion = pair;
+    pair->set_companion(cl);
+    cl->set_companion(pair);
 
     char theme = distribution.operator()(generator);
     cl->get_buffer_data()[2] = theme;
