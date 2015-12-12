@@ -67,6 +67,7 @@ public:
 
     bool send_leaved();
     bool send_bad_vote();
+    bool send_greetings(unsigned int users_online);
 
     int get_message_type() const;
 

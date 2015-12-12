@@ -258,8 +258,12 @@ bool server::init()
     }
 
     //Creating threads
-    //g_workers_count = g_worker_threads_per_processor * get_proc_count();
+#ifndef _DEBUG
+    g_workers_count = g_worker_threads_per_processor * get_proc_count();
+#else
     g_workers_count = 2;
+#endif
+
     std::cout << "Threads count: " << g_workers_count << std::endl;
     g_worker_threads = new HANDLE[g_workers_count];
 
@@ -322,9 +326,8 @@ int server::main_cycle()
         }
 
         //Sending greetings
-        std::string greetings = STR_GREETINGS + client_name + "!\r\n";
-
-        if (!client->send(greetings))
+        std::cout << "Clients count:" << g_client_storage.clients_count() << std::endl;
+        if (!client->send_greetings(g_client_storage.clients_count()))
         {
             printf("\nError in Initial send. %d\n", WSAGetLastError());
             g_client_storage.detach_client(client);

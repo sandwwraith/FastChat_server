@@ -40,10 +40,16 @@ void client_storage::clear_all()
     LeaveCriticalSection(&cs_clientList);
 }
 
-std::list<Client*> const& client_storage::watch_clients() const
+std::vector<Client*> const& client_storage::watch_clients() const
 {
     return storage;
 }
+
+unsigned int client_storage::clients_count() const
+{
+    return static_cast<int>(storage.size());
+}
+
 
 client_storage::client_storage()
 {

@@ -78,6 +78,19 @@ void Client::skip_send()
     this->op_code = OP_RECV;
 }
 
+bool Client::send_greetings(unsigned int users_online)
+{
+    static_assert(sizeof(int) == 4,"Sizeof(int) doesn't equals 4");
+
+    std::string buf;
+    buf.push_back(42);
+    buf.push_back(users_online >> 24 & 0xFF);
+    buf.push_back(users_online >> 16 & 0xFF);
+    buf.push_back(users_online >> 8 & 0xFF);
+    buf.push_back(users_online & 0xFF);
+    return this->send(buf);
+}
+
 bool Client::send_bad_vote()
 {
     std::string s = {42, MST_VOTING, 0};
