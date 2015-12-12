@@ -50,7 +50,6 @@ unsigned int client_storage::clients_count() const
     return static_cast<int>(storage.size());
 }
 
-
 client_storage::client_storage()
 {
     InitializeCriticalSection(&cs_clientList);

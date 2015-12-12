@@ -12,6 +12,7 @@
 //Server recievs data
 
 //Client statuses
+#define DUMMY -1
 #define STATE_NEW 0
 #define STATE_INIT 1
 #define STATE_QUEUED 2
@@ -44,7 +45,7 @@ private:
     Client* companion = nullptr;    
 public:
     int op_code;
-    int id;
+    unsigned long id;
     int client_status;
 
     Client* get_companion() const;

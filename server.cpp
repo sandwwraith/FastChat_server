@@ -23,6 +23,20 @@ DWORD server::WorkerThread(LPVOID param)
             return 0;
         }
         Client* client = static_cast<Client*>(context);
+        if (client->client_status == DUMMY)
+        {
+            if (me->lastAccepted != nullptr) {
+                std::cout << "Accept successfull, bytes:" << (int)dwBytesTransfered << std::endl;
+                me->g_client_storage.attach_client(me->lastAccepted);
+                me->lastAccepted->send_greetings(me->g_client_storage.clients_count());
+                me->lastAccepted = nullptr;
+                me->accept();
+            } else
+            {
+                std::cout << "WTF\n";
+            }
+            continue;
+        }
         if (dwBytesTransfered == 0) //Client dropped connection
         {
             std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
@@ -190,6 +204,60 @@ DWORD server::WorkerThread(LPVOID param)
     }
 }
 
+bool server::accept()
+{
+    GUID GuidAcceptEx = WSAID_ACCEPTEX;
+    LPFN_ACCEPTEX lpfnAcceptEx = NULL;
+    DWORD dwBytes;
+    int res = WSAIoctl(listenSock, SIO_GET_EXTENSION_FUNCTION_POINTER
+        , &GuidAcceptEx, sizeof(GuidAcceptEx), &lpfnAcceptEx, sizeof(lpfnAcceptEx)
+        , &dwBytes, nullptr, nullptr);
+
+    if (res == SOCKET_ERROR)
+    {
+        std::cout << "Can't get pointer: " << WSAGetLastError() << std::endl;
+        return false;
+    }
+
+    SOCKET acc_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
+    if (acc_socket == INVALID_SOCKET)
+    {
+        std::cout << "Can't create listen socket: " << WSAGetLastError() << std::endl;
+        return false;
+    }
+
+    OVERLAPPED ovrl;
+    ZeroMemory(&ovrl, sizeof(OVERLAPPED));
+    char buf[sizeof(sockaddr_in) * 2 + 32 + 1];
+
+    BOOL b = lpfnAcceptEx(listenSock, acc_socket
+        , buf, 0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16
+        , &dwBytes, &ovrl);
+
+    if (!b && WSAGetLastError() != WSA_IO_PENDING) {
+        std::cout << "AcceptEx failed: " << WSAGetLastError() << std::endl;
+        return false;
+    }
+
+    //res = setsockopt(acc_socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+    //    (char*)&listenSock, sizeof(listenSock));
+    //if (res == SOCKET_ERROR)
+    //{
+    //    std::cout << "Set sock opt failed: " << WSAGetLastError() << std::endl;
+    //}
+
+    Client* cl = new Client(acc_socket);
+    cl->id = counts++;
+    HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)cl, 0);
+    if (port == NULL)
+    {
+        std::cout << "Can't bind nwe client to comp port: " << GetLastError() << std::endl;
+        return false;
+    }
+    this->lastAccepted = cl;
+    return true;
+}
+
 SOCKET server::create_listen_socket()
 {
     //Creating overlapped socket
@@ -283,25 +351,31 @@ int server::main_cycle()
         return 1;
     }
     SOCKET sock = create_listen_socket();
+    listenSock = sock;
     if (sock == INVALID_SOCKET)
     {
         std::cout << "Failed to create listen socket\n";
         shutdown();
         return 1;
     }
+
+    Client* dummy = new Client(INVALID_SOCKET);
+    dummy->client_status = DUMMY;
+    CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)dummy, 0);
+    this->accept();
     //Switching socket to non-blocking mode (to perform operations on main thread)
-    unsigned long anb = 1;
-    ioctlsocket(sock, FIONBIO, &anb);
+   /* unsigned long anb = 1;
+    ioctlsocket(sock, FIONBIO, &anb);*/
 
     std::cout << "All OK, waiting for the connections" << std::endl;
     std::cout << "Press any key to exit" << std::endl;
 
     int count = 0;
-    while (!_kbhit()) {
+    while (true) {
 
         //Accepting new client
 
-        sockaddr_in client_address;
+        /*sockaddr_in client_address;
         int cl_length = sizeof(client_address);
         SOCKET accepted = WSAAccept(sock, reinterpret_cast<sockaddr*>(&client_address), &cl_length, nullptr, 0);
         if (accepted == INVALID_SOCKET)
@@ -332,7 +406,7 @@ int server::main_cycle()
             printf("\nError in Initial send. %d\n", WSAGetLastError());
             g_client_storage.detach_client(client);
             continue;
-        }
+        }*/
     }
     shutdown();
     return 0;

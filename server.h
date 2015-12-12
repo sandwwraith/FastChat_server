@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <winsock2.h>
+#include <mswsock.h>
 #include <string>
 #include <iostream>
 #include <conio.h>
@@ -61,8 +62,13 @@ private:
 
     static DWORD WINAPI WorkerThread(LPVOID); //Worker function for threads
     bool g_started = false;
-    SOCKET create_listen_socket();
 
+    SOCKET create_listen_socket();
+    SOCKET listenSock;
+    Client* lastAccepted = nullptr;
+
+    bool accept();
+    unsigned long counts = 0;
 public:
 
     int get_proc_count();
