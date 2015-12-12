@@ -15,6 +15,18 @@ int main(int argc, char* argv[])
     server serv;
     serv.set_global_addr(global);
     serv.init();
-    serv.main_cycle();
+    serv.start();
+    std::string s;
+
+    while (true)
+    {
+        std::cin >> s;
+        if (s.compare("shutdown") == 0)
+        {
+            serv.shutdown();
+            break;
+        }
+        std::cout << "Unknown command";
+    }
     return 0;
 }

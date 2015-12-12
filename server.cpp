@@ -158,7 +158,7 @@ DWORD server::WorkerThread(LPVOID param)
                 //Too easy. Look suspicious...
             }
             break;
-        case STATE_VOTING:
+        case STATE_VOTING: //TODO: BUG IF ONE LEAVED DURING VOTING
             //In this state, clients are only allowed to send or receive one message with results
 
             if (client->op_code == OP_RECV)
@@ -348,7 +348,7 @@ bool server::init()
     return true;
 }
 
-int server::main_cycle()
+int server::start()
 {
     if (!g_started && !init())
     {
@@ -369,12 +369,6 @@ int server::main_cycle()
     this->accept();
 
     std::cout << "All OK, waiting for the connections" << std::endl;
-    //std::cout << "Press any key to exit" << std::endl;
-
-    while (true) {
-        //TODO: Shutdown       
-    }
-    shutdown();
     return 0;
 }
 

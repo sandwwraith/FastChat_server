@@ -13,17 +13,8 @@
 
 #pragma comment(lib,"Ws2_32.lib")
 
-#ifndef CONSTANTS_SERVER
-#define CONSTANTS_SERVER
-
-//Defaul greetings message. It will be concatinated with user address
-#define STR_GREETINGS "Hello, user "
-#endif
-
-
 class server
 {
-private:
     //Global parameter for server address/port
     int g_server_port = 2539;
 
@@ -77,7 +68,7 @@ public:
     explicit server(bool init_now);
     bool init();
 
-    int main_cycle();
+    int start();
 
     void shutdown();
     ~server();
