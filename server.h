@@ -68,7 +68,7 @@ private:
     Client* lastAccepted = nullptr;
 
     bool accept();
-    unsigned long counts = 0;
+    unsigned long ids = 0;
 public:
 
     int get_proc_count();

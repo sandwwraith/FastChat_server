@@ -14,7 +14,6 @@ DWORD server::WorkerThread(LPVOID param)
         BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &pOverlapped, INFINITE);
         if (!queued_result)
         {
-            //Concurrency issues
             std::cout << "Error dequeing: " << GetLastError() << std::endl;
             continue;
         }
@@ -26,12 +25,25 @@ DWORD server::WorkerThread(LPVOID param)
         if (client->client_status == DUMMY)
         {
             if (me->lastAccepted != nullptr) {
-                std::cout << "Accept successfull, bytes:" << (int)dwBytesTransfered << std::endl;
+                std::cout << "Accept successfull, id:" << me->lastAccepted->id << std::endl;
+
+               int res = setsockopt(me->lastAccepted->get_socket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+                    (char*)&(me->listenSock), sizeof(me->listenSock));
+                if (res == SOCKET_ERROR)
+                {
+                    std::cout << "Set sock opt failed: " << WSAGetLastError() << std::endl;
+                }
+
                 me->g_client_storage.attach_client(me->lastAccepted);
-                me->lastAccepted->send_greetings(me->g_client_storage.clients_count());
+                if (!me->lastAccepted->send_greetings(me->g_client_storage.clients_count()))
+                {
+                    std::cout << "Error in inital send, drop client " << me->lastAccepted->id << std::endl;
+                    me->g_client_storage.detach_client(me->lastAccepted);
+                }
                 me->lastAccepted = nullptr;
                 me->accept();
-            } else
+            }
+            else
             {
                 std::cout << "WTF\n";
             }
@@ -45,7 +57,6 @@ DWORD server::WorkerThread(LPVOID param)
             continue;
         }
 
-        //TODO: Handle leave everywhere
         switch (client->client_status)
         {
         case STATE_NEW:
@@ -209,6 +220,7 @@ bool server::accept()
     GUID GuidAcceptEx = WSAID_ACCEPTEX;
     LPFN_ACCEPTEX lpfnAcceptEx = NULL;
     DWORD dwBytes;
+    //The most amazing function i've ever seen. 
     int res = WSAIoctl(listenSock, SIO_GET_EXTENSION_FUNCTION_POINTER
         , &GuidAcceptEx, sizeof(GuidAcceptEx), &lpfnAcceptEx, sizeof(lpfnAcceptEx)
         , &dwBytes, nullptr, nullptr);
@@ -228,7 +240,7 @@ bool server::accept()
 
     OVERLAPPED ovrl;
     ZeroMemory(&ovrl, sizeof(OVERLAPPED));
-    char buf[sizeof(sockaddr_in) * 2 + 32 + 1];
+    char buf[sizeof(sockaddr_in) * 2 + 32];
 
     BOOL b = lpfnAcceptEx(listenSock, acc_socket
         , buf, 0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16
@@ -239,15 +251,8 @@ bool server::accept()
         return false;
     }
 
-    //res = setsockopt(acc_socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
-    //    (char*)&listenSock, sizeof(listenSock));
-    //if (res == SOCKET_ERROR)
-    //{
-    //    std::cout << "Set sock opt failed: " << WSAGetLastError() << std::endl;
-    //}
-
     Client* cl = new Client(acc_socket);
-    cl->id = counts++;
+    cl->id = ids++;
     HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)cl, 0);
     if (port == NULL)
     {
@@ -350,9 +355,8 @@ int server::main_cycle()
         std::cout << "Failed to init\n";
         return 1;
     }
-    SOCKET sock = create_listen_socket();
-    listenSock = sock;
-    if (sock == INVALID_SOCKET)
+    listenSock = create_listen_socket();
+    if (listenSock == INVALID_SOCKET)
     {
         std::cout << "Failed to create listen socket\n";
         shutdown();
@@ -363,50 +367,12 @@ int server::main_cycle()
     dummy->client_status = DUMMY;
     CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)dummy, 0);
     this->accept();
-    //Switching socket to non-blocking mode (to perform operations on main thread)
-   /* unsigned long anb = 1;
-    ioctlsocket(sock, FIONBIO, &anb);*/
 
     std::cout << "All OK, waiting for the connections" << std::endl;
-    std::cout << "Press any key to exit" << std::endl;
+    //std::cout << "Press any key to exit" << std::endl;
 
-    int count = 0;
     while (true) {
-
-        //Accepting new client
-
-        /*sockaddr_in client_address;
-        int cl_length = sizeof(client_address);
-        SOCKET accepted = WSAAccept(sock, reinterpret_cast<sockaddr*>(&client_address), &cl_length, nullptr, 0);
-        if (accepted == INVALID_SOCKET)
-        {
-            if (WSAGetLastError() != WSAEWOULDBLOCK)
-                printf("Accept failed with error: %d\n", WSAGetLastError());
-            continue;
-        }
-
-        std::string client_name = inet_ntoa(client_address.sin_addr);
-        std::cout << "Connected: " << client_name << std::endl;
-        Client* client = new Client(accepted);
-        client->id = count++;
-        g_client_storage.attach_client(client);
-
-        //Associating client with IOCP
-        if (CreateIoCompletionPort((HANDLE)client->get_socket(), g_io_completion_port, (ULONG_PTR)client, 0) == nullptr)
-        {
-            std::cout << "Error linking client to completion port\n";
-            g_client_storage.detach_client(client);
-            continue;
-        }
-
-        //Sending greetings
-        std::cout << "Clients count:" << g_client_storage.clients_count() << std::endl;
-        if (!client->send_greetings(g_client_storage.clients_count()))
-        {
-            printf("\nError in Initial send. %d\n", WSAGetLastError());
-            g_client_storage.detach_client(client);
-            continue;
-        }*/
+        //TODO: Shutdown       
     }
     shutdown();
     return 0;
