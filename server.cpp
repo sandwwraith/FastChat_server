@@ -132,7 +132,13 @@ DWORD server::WorkerThread(LPVOID param)
                     client->client_status = STATE_VOTING;
                 if (client->get_message_type() == MST_LEAVE)
                     client->client_status = STATE_INIT;
-
+                if (client->get_message_type() == MST_DISCONNECT)
+                {
+                    std::cout << client->id << " send disconnect" << std::endl;
+                    if (client->has_companion()) client->get_companion()->delete_companion();
+                    me->g_client_storage.detach_client(client);
+                    break;
+                }
                 if (client->own_companion())
                 {
                     if (client->get_companion()->client_status == STATE_MESSAGING)
@@ -158,7 +164,7 @@ DWORD server::WorkerThread(LPVOID param)
                 //Too easy. Look suspicious...
             }
             break;
-        case STATE_VOTING: //TODO: BUG IF ONE LEAVED DURING VOTING
+        case STATE_VOTING:
             //In this state, clients are only allowed to send or receive one message with results
 
             if (client->op_code == OP_RECV)
@@ -172,7 +178,9 @@ DWORD server::WorkerThread(LPVOID param)
                 }
                 else
                 {
+                    client->client_status = STATE_FINISHED;
                     client->send_bad_vote();
+                    break;
                 }
 
                 client->client_status = STATE_FINISHED;
