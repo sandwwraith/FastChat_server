@@ -26,6 +26,11 @@ int main(int argc, char* argv[])
             serv.shutdown();
             break;
         }
+        if (s.compare("clients") == 0)
+        {
+            std::cout << serv.clients_count() << std::endl;
+            continue;
+        }
         std::cout << "Unknown command";
     }
     return 0;

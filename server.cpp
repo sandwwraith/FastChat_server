@@ -307,6 +307,11 @@ SOCKET server::create_listen_socket()
     return sock;
 }
 
+unsigned server::clients_count() const
+{
+    return g_client_storage.clients_count();
+}
+
 int server::get_proc_count()
 {
     if (g_processors_count == -1)

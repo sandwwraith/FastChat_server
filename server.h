@@ -63,6 +63,7 @@ private:
 public:
 
     int get_proc_count();
+    unsigned int clients_count() const;
     server();
     //if init_now is true, inits server immedeately
     explicit server(bool init_now);
