@@ -85,6 +85,7 @@ DWORD server::WorkerThread(LPVOID param)
                 if (client->get_message_type() != MST_QUEUE)
                 {
                     client->recieve(); // If you ignore it, maybe it will go away
+                    break;
                 }
 
                 //Making a pair for our client
