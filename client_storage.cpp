@@ -47,7 +47,7 @@ std::vector<Client*> const& client_storage::watch_clients() const
 
 unsigned int client_storage::clients_count() const
 {
-    return static_cast<int>(storage.size());
+    return static_cast<unsigned>(storage.size());
 }
 
 client_storage::client_storage()

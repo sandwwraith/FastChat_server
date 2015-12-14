@@ -46,6 +46,10 @@ void client_queue::lock()
 client_queue::client_queue()
 {
     InitializeCriticalSection(&sec);
+#ifndef _DEBUG
+    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
+    generator = std::default_random_engine(seed1);
+#endif
 }
 
 
