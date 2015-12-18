@@ -47,6 +47,7 @@ public:
     int op_code;
     unsigned long id;
     int client_status;
+    DWORD q_msg_size;
 
     Client* get_companion() const;
     void set_companion(Client*);

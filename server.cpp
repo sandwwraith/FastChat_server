@@ -92,15 +92,17 @@ DWORD server::WorkerThread(LPVOID param)
                 if (me->g_client_queue.size() >= 1)
                 {
                     me->g_client_queue.make_pair(client);
+                    client->q_msg_size = dwBytesTransfered;
                     //Send them info
-                    std::string msg1(client->get_buffer_data(), dwBytesTransfered);
-                    std::string msg2(client->get_companion()->get_buffer_data(), dwBytesTransfered);
+                    std::string msg1(client->get_buffer_data(), client->q_msg_size);
+                    std::string msg2(client->get_companion()->get_buffer_data(), client->get_companion()->q_msg_size);
                     client->send(msg2);
                     client->get_companion()->send(msg1); //TODO: rework this also to own_companion
                 }
                 else
                 {
                     //Enqueue user
+                    client->q_msg_size = dwBytesTransfered;
                     me->g_client_queue.push(client);
                 }
             }
@@ -170,6 +172,11 @@ DWORD server::WorkerThread(LPVOID param)
 
             if (client->op_code == OP_RECV)
             {
+                if (client->get_message_type() != MST_VOTING)
+                {
+                    client->recieve();
+                    break;
+                }
                 std::string msg(client->get_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " voted " << msg << std::endl;
                 if (client->own_companion())
