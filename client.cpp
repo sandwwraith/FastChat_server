@@ -156,10 +156,10 @@ Client::~Client()
     std::cout << id << " destroyed\n";
 
     //Wait for the pending operations to complete
-    while (!HasOverlappedIoCompleted(overlapped))
+    /*while (!HasOverlappedIoCompleted(overlapped))
     {
         Sleep(1);
-    }
+    }*/
 
     closesocket(socket);
 

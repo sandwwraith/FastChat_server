@@ -30,7 +30,6 @@
 
 class Client
 {
-private:
     //Field, necessary for overlapped (async) operations
     OVERLAPPED *overlapped;
 

@@ -14,7 +14,12 @@ DWORD server::WorkerThread(LPVOID param)
         BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &pOverlapped, INFINITE);
         if (!queued_result)
         {
-            std::cout << "Error dequeing: " << GetLastError() << std::endl; //121 = ERROR_SEM_TIMEOUT; 64 - NET_NAME_INVALID, need to delete client
+            auto err_code = GetLastError();
+            std::cout << "Error dequeing: " << err_code << std::endl; //121 = ERROR_SEM_TIMEOUT; 64 - NET_NAME_INVALID, need to delete client
+            if (err_code == ERROR_SEM_TIMEOUT || err_code == ERROR_NETNAME_DELETED)
+            {
+                me->drop_client(static_cast<Client*>(context));
+            }
             continue;
         }
         if (context == nullptr) //Signal to shutdown
@@ -38,7 +43,7 @@ DWORD server::WorkerThread(LPVOID param)
                 if (!me->lastAccepted->send_greetings(me->g_client_storage.clients_count()))
                 {
                     std::cout << "Error in inital send, drop client " << me->lastAccepted->id << std::endl;
-                    me->g_client_storage.detach_client(me->lastAccepted);
+                    me->drop_client(me->lastAccepted);
                 }
                 me->lastAccepted = nullptr;
                 me->accept();
@@ -52,9 +57,7 @@ DWORD server::WorkerThread(LPVOID param)
         if (dwBytesTransfered == 0) //Client dropped connection
         {
             std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
-            if (client->has_companion()) client->get_companion()->delete_companion();
-            me->g_client_storage.detach_client(client);
-            if (client->q_msg.size() > 0) me->g_client_queue.remove(client);
+            me->drop_client(client);
             continue;
         }
 
@@ -68,7 +71,7 @@ DWORD server::WorkerThread(LPVOID param)
             {
                 std::cout << "Error occurred while executing WSARecv: " << WSAGetLastError() << std::endl;
                 //Let's not work with this client
-                me->g_client_storage.detach_client(client);
+                me->drop_client(client);
                 break;
             }
 
@@ -80,8 +83,7 @@ DWORD server::WorkerThread(LPVOID param)
                 if (client->get_message_type() == MST_DISCONNECT)
                 {
                     std::cout << client->id << " send disconnect" << std::endl;
-                    me->g_client_storage.detach_client(client);
-                    if (client->q_msg.size() > 0) me->g_client_queue.remove(client);
+                    me->drop_client(client);
                     break;
                 }
                 if (client->get_message_type() != MST_QUEUE || client->q_msg.size() > 0)
@@ -138,8 +140,7 @@ DWORD server::WorkerThread(LPVOID param)
                 if (client->get_message_type() == MST_DISCONNECT)
                 {
                     std::cout << client->id << " send disconnect" << std::endl;
-                    if (client->has_companion()) client->get_companion()->delete_companion();
-                    me->g_client_storage.detach_client(client);
+                    me->drop_client(client);
                     break;
                 }
                 if (client->own_companion())
@@ -268,7 +269,7 @@ bool server::accept()
     HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)cl, 0);
     if (port == nullptr)
     {
-        std::cout << "Can't bind nwe client to comp port: " << GetLastError() << std::endl;
+        std::cout << "Can't bind new client to comp port: " << GetLastError() << std::endl;
         return false;
     }
     this->lastAccepted = cl;
@@ -314,6 +315,15 @@ SOCKET server::create_listen_socket()
 unsigned server::clients_count() const
 {
     return g_client_storage.clients_count();
+}
+
+void server::drop_client(Client* cl)
+{
+    if (cl == nullptr) return;
+    if (cl->q_msg.size() > 0) g_client_queue.remove(cl);
+    if (cl->has_companion()) cl->get_companion()->delete_companion();
+    g_client_storage.detach_client(cl);
+    return;
 }
 
 int server::get_proc_count()

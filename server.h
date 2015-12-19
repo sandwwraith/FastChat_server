@@ -63,6 +63,8 @@ private:
 
     bool accept();
     unsigned long ids = 0;
+
+    void drop_client(Client* cl);
 public:
 
     int get_proc_count();
