@@ -55,7 +55,7 @@ void client_queue::lock()
 client_queue::client_queue()
 {
     InitializeCriticalSection(&sec);
-    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
+    uint64_t seed1 = std::chrono::system_clock::now().time_since_epoch().count();
     generator = std::default_random_engine(seed1);
 }
 

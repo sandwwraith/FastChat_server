@@ -56,6 +56,9 @@ private:
 
     SOCKET create_listen_socket();
     SOCKET listenSock;
+
+    OVERLAPPED* overlapped_ac;
+    char* accept_buf;
     Client* lastAccepted = nullptr;
 
     bool accept();

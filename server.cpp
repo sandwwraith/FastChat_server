@@ -14,7 +14,7 @@ DWORD server::WorkerThread(LPVOID param)
         BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &pOverlapped, INFINITE);
         if (!queued_result)
         {
-            std::cout << "Error dequeing: " << GetLastError() << std::endl;
+            std::cout << "Error dequeing: " << GetLastError() << std::endl; //121 = ERROR_SEM_TIMEOUT; 64 - NET_NAME_INVALID, need to delete client
             continue;
         }
         if (context == nullptr) //Signal to shutdown
@@ -54,7 +54,7 @@ DWORD server::WorkerThread(LPVOID param)
             std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
             if (client->has_companion()) client->get_companion()->delete_companion();
             me->g_client_storage.detach_client(client);
-            if (client->client_status == STATE_INIT) me->g_client_queue.remove(client);
+            if (client->q_msg.size() > 0) me->g_client_queue.remove(client);
             continue;
         }
 
@@ -234,7 +234,7 @@ DWORD server::WorkerThread(LPVOID param)
 bool server::accept()
 {
     GUID GuidAcceptEx = WSAID_ACCEPTEX;
-    LPFN_ACCEPTEX lpfnAcceptEx = NULL;
+    LPFN_ACCEPTEX lpfnAcceptEx = nullptr;
     DWORD dwBytes;
     //The most amazing function i've ever seen. 
     int res = WSAIoctl(listenSock, SIO_GET_EXTENSION_FUNCTION_POINTER
@@ -254,13 +254,9 @@ bool server::accept()
         return false;
     }
 
-    OVERLAPPED ovrl;
-    ZeroMemory(&ovrl, sizeof(OVERLAPPED));
-    char buf[sizeof(sockaddr_in) * 2 + 32];
-
     BOOL b = lpfnAcceptEx(listenSock, acc_socket
-        , buf, 0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16
-        , &dwBytes, &ovrl);
+        , accept_buf, 0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16
+        , &dwBytes, overlapped_ac);
 
     if (!b && WSAGetLastError() != WSA_IO_PENDING) {
         std::cout << "AcceptEx failed: " << WSAGetLastError() << std::endl;
@@ -270,7 +266,7 @@ bool server::accept()
     Client* cl = new Client(acc_socket);
     cl->id = ids++;
     HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)cl, 0);
-    if (port == NULL)
+    if (port == nullptr)
     {
         std::cout << "Can't bind nwe client to comp port: " << GetLastError() << std::endl;
         return false;
@@ -453,6 +449,8 @@ server::server() : server(false)
 
 server::server(bool init_now)
 {
+    overlapped_ac = new OVERLAPPED{};
+    accept_buf = static_cast<char*>(malloc(sizeof(char)*(2 * sizeof(sockaddr_in) + 32)));
     if (init_now)
     {
         g_started = init();
@@ -462,4 +460,6 @@ server::server(bool init_now)
 server::~server()
 {
     if (g_started) shutdown();
+    delete overlapped_ac;
+    free(accept_buf);
 }
