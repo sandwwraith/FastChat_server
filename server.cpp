@@ -53,7 +53,8 @@ DWORD server::WorkerThread(LPVOID param)
         {
             std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
             if (client->has_companion()) client->get_companion()->delete_companion();
-            me->g_client_storage.detach_client(client); //TODO: Delete from queue
+            me->g_client_storage.detach_client(client);
+            if (client->client_status == STATE_INIT) me->g_client_queue.remove(client);
             continue;
         }
 
@@ -80,9 +81,10 @@ DWORD server::WorkerThread(LPVOID param)
                 {
                     std::cout << client->id << " send disconnect" << std::endl;
                     me->g_client_storage.detach_client(client);
+                    if (client->q_msg.size() > 0) me->g_client_queue.remove(client);
                     break;
                 }
-                if (client->get_message_type() != MST_QUEUE)
+                if (client->get_message_type() != MST_QUEUE || client->q_msg.size() > 0)
                 {
                     client->recieve(); // If you ignore it, maybe it will go away
                     break;
@@ -91,20 +93,21 @@ DWORD server::WorkerThread(LPVOID param)
                 //Making a pair for our client
                 if (me->g_client_queue.size() >= 1)
                 {
+                    client->q_msg = std::string(client->get_buffer_data(), dwBytesTransfered);
+                    std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
                     me->g_client_queue.make_pair(client);
-                    client->q_msg_size = dwBytesTransfered;
                     //Send them info
-                    std::string msg1(client->get_buffer_data(), client->q_msg_size);
-                    std::string msg2(client->get_companion()->get_buffer_data(), client->get_companion()->q_msg_size);
-                    client->send(msg2);
-                    client->get_companion()->send(msg1); //TODO: rework this also to own_companion
+                    client->send(client->get_companion()->q_msg);
+                    client->get_companion()->send(client->q_msg); //TODO: rework this also to own_companion
                 }
                 else
                 {
                     //Enqueue user
-                    client->q_msg_size = dwBytesTransfered;
+                    client->q_msg = std::string(client->get_buffer_data(), dwBytesTransfered);
+                    std::cout << client->id << "Q_MSG:"<<client->q_msg<<std::endl;
                     me->g_client_queue.push(client);
                 }
+                client->recieve(); //Client may wish to disconnect
             }
             else
             {
@@ -112,13 +115,10 @@ DWORD server::WorkerThread(LPVOID param)
                 //Change only one client, 'cause we'll got two SEND complete statuses
                 if (client->get_message_type() == MST_QUEUE)
                 {
+                    client->get_companion()->q_msg.resize(0);
                     client->client_status = STATE_MESSAGING;
-                    client->recieve();
                 }
-                else
-                {
-                    client->skip_send();
-                }
+                client->skip_send();
             }
             break;
         case STATE_MESSAGING:
