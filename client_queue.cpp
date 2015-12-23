@@ -14,8 +14,11 @@ void client_queue::remove(Client* cl)
 {
     for (auto it = q.begin(); it != q.end(); ++it)
     {
-        if (*it == cl) q.erase(it);
-        break;
+        if (*it == cl) 
+        {
+            q.erase(it);
+            break;
+        }
     }
 }
 
@@ -55,8 +58,8 @@ void client_queue::lock()
 client_queue::client_queue()
 {
     InitializeCriticalSection(&sec);
-    uint64_t seed1 = std::chrono::system_clock::now().time_since_epoch().count();
-    generator = std::default_random_engine(seed1);
+    uint64_t seed = std::chrono::system_clock::now().time_since_epoch().count();
+    generator = std::default_random_engine(static_cast<unsigned int>(seed));
 }
 
 

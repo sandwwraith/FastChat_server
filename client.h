@@ -32,6 +32,53 @@ struct OVERLAPPED_EX : OVERLAPPED
 {
     unsigned operation_code;
 };
+
+struct ClientBuffer
+{
+    WSABUF *recv_buf;
+    WSABUF *send_buf;
+
+    ClientBuffer()
+    {
+        recv_buf = new WSABUF;
+        ZeroMemory(recv_buf, sizeof(WSABUF));
+        recv_buf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
+        recv_buf->len = MAX_BUFFER_SIZE;
+
+        send_buf = new WSABUF;
+        ZeroMemory(send_buf, sizeof(WSABUF));
+        send_buf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
+        send_buf->len = MAX_BUFFER_SIZE;
+    }
+
+    ~ClientBuffer()
+    {
+        free(recv_buf->buf);
+        free(send_buf->buf);
+
+        delete send_buf;
+        delete recv_buf;
+    }
+
+    void reset_snd_buf()
+    {
+        ZeroMemory(send_buf->buf, MAX_BUFFER_SIZE);
+        send_buf->len = MAX_BUFFER_SIZE;
+    }
+
+    void reset_recv_buf()
+    {
+        ZeroMemory(recv_buf->buf, MAX_BUFFER_SIZE);
+        recv_buf->len = MAX_BUFFER_SIZE;
+    }
+
+    void fill_send_buf(std::string const& message)
+    {
+        this->reset_snd_buf();
+        CopyMemory(send_buf->buf, message.c_str(), message.length());
+        send_buf->len = message.length();
+    }
+};
 class Client
 {
     //Field, necessary for overlapped (async) operations
@@ -39,7 +86,8 @@ class Client
     OVERLAPPED_EX *overlapped_recv;
 
     //Buffer with data
-    WSABUF *wsabuf;
+    //WSABUF *wsabuf;
+    ClientBuffer buffer;
 
     //Socket of client
     SOCKET socket;
@@ -58,22 +106,19 @@ public:
     bool has_companion();
     bool own_companion();
 
-    char* get_buffer_data();
-    int get_buffer_size() const;
-    WSABUF* get_wsabuff_ptr();
-    void reset_buffer();
+    char* get_recv_buffer_data();
     SOCKET get_socket();
 
     //Remember, this will reset your buffer
     bool recieve();
     bool send(std::string const&);
-    void skip_send();
 
     bool send_leaved();
     bool send_bad_vote();
     bool send_greetings(unsigned int users_online);
 
-    int get_message_type() const;
+    int get_recv_message_type() const;
+    int get_snd_message_type() const;
 
     void lock();
     void unlock();

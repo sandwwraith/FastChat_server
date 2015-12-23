@@ -85,13 +85,13 @@ DWORD server::WorkerThread(LPVOID param)
             //In this state, client may ask to queue him (OP_RECV) or to get pair (OP_SEND)
             if (overlapped_ex->operation_code == OP_RECV)
             {
-                if (client->get_message_type() == MST_DISCONNECT)
+                if (client->get_recv_message_type() == MST_DISCONNECT)
                 {
                     std::cout << client->id << " send disconnect" << std::endl;
                     me->drop_client(client);
                     break;
                 }
-                if (client->get_message_type() != MST_QUEUE || client->q_msg.size() > 0)
+                if (client->get_recv_message_type() != MST_QUEUE || client->q_msg.size() > 0)
                 {
                     client->recieve(); // If you ignore it, maybe it will go away
                     break;
@@ -100,7 +100,7 @@ DWORD server::WorkerThread(LPVOID param)
                 //Making a pair for our client
                 if (me->g_client_queue.size() >= 1)
                 {
-                    client->q_msg = std::string(client->get_buffer_data(), dwBytesTransfered);
+                    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
                     std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
                     me->g_client_queue.make_pair(client);
                     //Send them info
@@ -110,7 +110,7 @@ DWORD server::WorkerThread(LPVOID param)
                 else
                 {
                     //Enqueue user
-                    client->q_msg = std::string(client->get_buffer_data(), dwBytesTransfered);
+                    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
                     std::cout << client->id << "Q_MSG:"<<client->q_msg<<std::endl;
                     me->g_client_queue.push(client);
                 }
@@ -120,12 +120,11 @@ DWORD server::WorkerThread(LPVOID param)
             {
                 //Clients has received their themes and started messaging
                 //Change only one client, 'cause we'll got two SEND complete statuses
-                if (client->get_message_type() == MST_QUEUE)
+                if (client->get_snd_message_type()== MST_QUEUE)
                 {
                     client->get_companion()->q_msg.resize(0);
                     client->client_status = STATE_MESSAGING;
                 }
-                client->skip_send();
             }
             break;
         case STATE_MESSAGING:
@@ -134,15 +133,15 @@ DWORD server::WorkerThread(LPVOID param)
             if (overlapped_ex->operation_code == OP_RECV)
             {
                 //We have received smth, let's send it to another client
-                std::string msg(client->get_buffer_data(), dwBytesTransfered);
+                std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " messaged " << msg << std::endl;
 
                 //Change state if msg timeout or leave
-                if (client->get_message_type() == MST_TIMEOUT)
+                if (client->get_recv_message_type() == MST_TIMEOUT)
                     client->client_status = STATE_VOTING;
-                if (client->get_message_type() == MST_LEAVE)
+                if (client->get_recv_message_type() == MST_LEAVE)
                     client->client_status = STATE_INIT;
-                if (client->get_message_type() == MST_DISCONNECT)
+                if (client->get_recv_message_type() == MST_DISCONNECT)
                 {
                     std::cout << client->id << " send disconnect" << std::endl;
                     me->drop_client(client);
@@ -165,12 +164,10 @@ DWORD server::WorkerThread(LPVOID param)
             else
             {
                 // This client is already on receive, just got the message from companion
-                if (client->get_message_type() == MST_TIMEOUT)
+                if (client->get_snd_message_type() == MST_TIMEOUT)
                     client->client_status = STATE_VOTING;
-                if (client->get_message_type() == MST_LEAVE)
+                if (client->get_snd_message_type() == MST_LEAVE)
                     client->client_status = STATE_INIT;
-                client->skip_send();
-                //Too easy. Look suspicious...
             }
             break;
         case STATE_VOTING:
@@ -178,12 +175,12 @@ DWORD server::WorkerThread(LPVOID param)
 
             if (overlapped_ex->operation_code == OP_RECV)
             {
-                if (client->get_message_type() != MST_VOTING)
+                if (client->get_recv_message_type() != MST_VOTING)
                 {
                     client->recieve();
                     break;
                 }
-                std::string msg(client->get_buffer_data(), dwBytesTransfered);
+                std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " voted " << msg << std::endl;
                 if (client->own_companion())
                 {
@@ -202,7 +199,6 @@ DWORD server::WorkerThread(LPVOID param)
             else
             {
                 //If this client received, but didn't voted itself
-                client->skip_send();
 
                 client->client_status = STATE_FINISHED;
             }
@@ -214,7 +210,7 @@ DWORD server::WorkerThread(LPVOID param)
 
             if (overlapped_ex->operation_code == OP_RECV)
             {
-                std::string msg(client->get_buffer_data(), dwBytesTransfered);
+                std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " voted " << msg << std::endl;
                 if (client->own_companion())
                 {

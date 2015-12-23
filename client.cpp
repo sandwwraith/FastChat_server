@@ -36,39 +36,18 @@ void Client::set_companion(Client* cmp)
     companion = cmp;
 }
 
-char* Client::get_buffer_data()
+char* Client::get_recv_buffer_data()
 {
-    return wsabuf->buf;
-}
-
-int Client::get_buffer_size() const
-{
-    return wsabuf->len;
-}
-
-WSABUF* Client::get_wsabuff_ptr()
-{
-    return wsabuf;
-}
-
-void Client::reset_buffer()
-{
-    wsabuf->len = MAX_BUFFER_SIZE;
-    ZeroMemory(wsabuf->buf, wsabuf->len);
+    return buffer.recv_buf->buf;
 }
 
 bool Client::recieve()
 {
     std::cout << id << " receiving...(#" << std::this_thread::get_id() << std::endl;
-    DWORD dwBytes, dwFlags = 0;
-    reset_buffer();
-    int snd = WSARecv(this->get_socket(), this->get_wsabuff_ptr(), 1, &dwBytes, &dwFlags, overlapped_recv, nullptr);
+    DWORD dwBytes = 0, dwFlags = 0;
+    buffer.reset_recv_buf();
+    int snd = WSARecv(this->socket, buffer.recv_buf, 1, &dwBytes, &dwFlags, overlapped_recv, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
-}
-
-void Client::skip_send()
-{
-    this->reset_buffer();
 }
 
 bool Client::send_greetings(unsigned int users_online)
@@ -99,13 +78,11 @@ bool Client::send_leaved()
 bool Client::send(std::string const & message)
 {
     std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
-    this->reset_buffer();
-    CopyMemory(wsabuf->buf, message.c_str(), message.length());
-    wsabuf->len = message.length();
-
+     
+    buffer.fill_send_buf(message);
     DWORD dwBytes = 0;
     DWORD dwFlags = 0;
-    auto snd = WSASend(this->socket, wsabuf, 1, &dwBytes, dwFlags, overlapped_send, nullptr);
+    auto snd = WSASend(this->socket, buffer.send_buf, 1, &dwBytes, dwFlags, overlapped_send, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
@@ -119,9 +96,14 @@ void Client::unlock()
     LeaveCriticalSection(&cl_sec);
 }
 
-int Client::get_message_type() const
+int Client::get_snd_message_type() const
 {
-    return this->wsabuf->buf[1];
+    return this->buffer.send_buf->buf[1];
+}
+
+int Client::get_recv_message_type() const
+{
+    return this->buffer.recv_buf->buf[1];
 }
 
 SOCKET Client::get_socket()
@@ -137,12 +119,6 @@ Client::Client(SOCKET s) : socket(s)
     overlapped_send = new OVERLAPPED_EX{};
     overlapped_send->operation_code = OP_SEND;
 
-    wsabuf = new WSABUF;
-
-    ZeroMemory(wsabuf, sizeof(WSABUF));
-    wsabuf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
-    reset_buffer();
-
     InitializeCriticalSection(&cl_sec);
 }
 
@@ -150,18 +126,11 @@ Client::~Client()
 {
     std::cout << id << " destroyed\n";
 
-    //Wait for the pending operations to complete
-    /*while (!HasOverlappedIoCompleted(overlapped))
-    {
-        Sleep(1);
-    }*/
     if (HasOverlappedIoCompleted(overlapped_recv)) delete overlapped_recv;
 
     closesocket(socket);
 
     if (HasOverlappedIoCompleted(overlapped_send)) delete overlapped_send;
-    reset_buffer();
-    free(wsabuf->buf);
-    delete wsabuf;
+
     DeleteCriticalSection(&cl_sec);
 }
