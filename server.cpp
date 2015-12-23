@@ -20,6 +20,10 @@ DWORD server::WorkerThread(LPVOID param)
             {
                 me->drop_client(static_cast<Client*>(context));
             }
+            if(err_code == ERROR_CONNECTION_ABORTED) //Deleted socket
+            {
+                delete pOverlapped;
+            }
             continue;
         }
         if (context == nullptr) //Signal to shutdown

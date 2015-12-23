@@ -51,11 +51,6 @@ WSABUF* Client::get_wsabuff_ptr()
     return wsabuf;
 }
 
-OVERLAPPED* Client::get_overlapped_ptr()
-{
-    return overlapped;
-}
-
 void Client::reset_buffer()
 {
     wsabuf->len = MAX_BUFFER_SIZE;
@@ -68,7 +63,7 @@ bool Client::recieve()
     DWORD dwBytes, dwFlags = 0;
     reset_buffer();
     this->op_code = OP_RECV;
-    int snd = WSARecv(this->get_socket(), this->get_wsabuff_ptr(), 1, &dwBytes, &dwFlags, this->get_overlapped_ptr(), nullptr);
+    int snd = WSARecv(this->get_socket(), this->get_wsabuff_ptr(), 1, &dwBytes, &dwFlags, overlapped_recv, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
@@ -113,7 +108,7 @@ bool Client::send(std::string const & message)
     DWORD dwBytes = 0;
     DWORD dwFlags = 0;
     op_code = OP_SEND;
-    auto snd = WSASend(this->socket, wsabuf, 1, &dwBytes, dwFlags, overlapped, nullptr);
+    auto snd = WSASend(this->socket, wsabuf, 1, &dwBytes, dwFlags, overlapped_send, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
@@ -140,10 +135,13 @@ SOCKET Client::get_socket()
 Client::Client(SOCKET s) : socket(s)
 {
     client_status = STATE_NEW;
-    overlapped = new OVERLAPPED;
+    overlapped_recv = new OVERLAPPED_EX{};
+    overlapped_recv->operation_code = OP_RECV;
+    overlapped_send = new OVERLAPPED_EX{};
+    overlapped_send->operation_code = OP_SEND;
+
     wsabuf = new WSABUF;
 
-    ZeroMemory(overlapped, sizeof(OVERLAPPED));
     ZeroMemory(wsabuf, sizeof(WSABUF));
     wsabuf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
     reset_buffer();
@@ -160,10 +158,11 @@ Client::~Client()
     {
         Sleep(1);
     }*/
+    if (HasOverlappedIoCompleted(overlapped_recv)) delete overlapped_recv;
 
     closesocket(socket);
 
-    delete overlapped;
+    if (HasOverlappedIoCompleted(overlapped_send)) delete overlapped_send;
     reset_buffer();
     free(wsabuf->buf);
     delete wsabuf;

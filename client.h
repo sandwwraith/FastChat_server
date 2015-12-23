@@ -28,10 +28,15 @@
 #define MST_DISCONNECT 10
 #define MST_LEAVE 69
 
+struct OVERLAPPED_EX : OVERLAPPED
+{
+    unsigned operation_code;
+};
 class Client
 {
     //Field, necessary for overlapped (async) operations
-    OVERLAPPED *overlapped;
+    OVERLAPPED_EX *overlapped_send;
+    OVERLAPPED_EX *overlapped_recv;
 
     //Buffer with data
     WSABUF *wsabuf;
@@ -57,7 +62,6 @@ public:
     char* get_buffer_data();
     int get_buffer_size() const;
     WSABUF* get_wsabuff_ptr();
-    OVERLAPPED* get_overlapped_ptr();
     void reset_buffer();
     SOCKET get_socket();
 
