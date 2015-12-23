@@ -62,7 +62,6 @@ bool Client::recieve()
     std::cout << id << " receiving...(#" << std::this_thread::get_id() << std::endl;
     DWORD dwBytes, dwFlags = 0;
     reset_buffer();
-    this->op_code = OP_RECV;
     int snd = WSARecv(this->get_socket(), this->get_wsabuff_ptr(), 1, &dwBytes, &dwFlags, overlapped_recv, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
@@ -70,7 +69,6 @@ bool Client::recieve()
 void Client::skip_send()
 {
     this->reset_buffer();
-    this->op_code = OP_RECV;
 }
 
 bool Client::send_greetings(unsigned int users_online)
@@ -107,7 +105,6 @@ bool Client::send(std::string const & message)
 
     DWORD dwBytes = 0;
     DWORD dwFlags = 0;
-    op_code = OP_SEND;
     auto snd = WSASend(this->socket, wsabuf, 1, &dwBytes, dwFlags, overlapped_send, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }

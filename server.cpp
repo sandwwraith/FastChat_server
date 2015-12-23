@@ -6,12 +6,13 @@ DWORD server::WorkerThread(LPVOID param)
 {
     server* me = static_cast<server*>(param);
     void* context = nullptr;
-    OVERLAPPED* pOverlapped = nullptr;
+    OVERLAPPED* overlapped = nullptr;
+    OVERLAPPED_EX* overlapped_ex = nullptr;
     DWORD dwBytesTransfered = 0;
 
     while (true)
     {
-        BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &pOverlapped, INFINITE);
+        BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &overlapped, INFINITE);
         if (!queued_result)
         {
             auto err_code = GetLastError();
@@ -22,7 +23,7 @@ DWORD server::WorkerThread(LPVOID param)
             }
             if(err_code == ERROR_CONNECTION_ABORTED) //Deleted socket
             {
-                delete pOverlapped;
+                delete overlapped_ex;
             }
             continue;
         }
@@ -64,7 +65,7 @@ DWORD server::WorkerThread(LPVOID param)
             me->drop_client(client);
             continue;
         }
-
+        overlapped_ex = static_cast<OVERLAPPED_EX*>(overlapped);
         switch (client->client_status)
         {
         case STATE_NEW:
@@ -82,7 +83,7 @@ DWORD server::WorkerThread(LPVOID param)
             break;
         case STATE_INIT:
             //In this state, client may ask to queue him (OP_RECV) or to get pair (OP_SEND)
-            if (client->op_code == OP_RECV)
+            if (overlapped_ex->operation_code == OP_RECV)
             {
                 if (client->get_message_type() == MST_DISCONNECT)
                 {
@@ -130,7 +131,7 @@ DWORD server::WorkerThread(LPVOID param)
         case STATE_MESSAGING:
             //Client just sending and receiving
 
-            if (client->op_code == OP_RECV)
+            if (overlapped_ex->operation_code == OP_RECV)
             {
                 //We have received smth, let's send it to another client
                 std::string msg(client->get_buffer_data(), dwBytesTransfered);
@@ -175,7 +176,7 @@ DWORD server::WorkerThread(LPVOID param)
         case STATE_VOTING:
             //In this state, clients are only allowed to send or receive one message with results
 
-            if (client->op_code == OP_RECV)
+            if (overlapped_ex->operation_code == OP_RECV)
             {
                 if (client->get_message_type() != MST_VOTING)
                 {
@@ -211,7 +212,7 @@ DWORD server::WorkerThread(LPVOID param)
             //In this state, client who send first, received pair message and resets
             //Client who send second delivers his message to first and also resets
 
-            if (client->op_code == OP_RECV)
+            if (overlapped_ex->operation_code == OP_RECV)
             {
                 std::string msg(client->get_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " voted " << msg << std::endl;

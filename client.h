@@ -48,7 +48,6 @@ class Client
 
     Client* companion = nullptr;    
 public:
-    int op_code;
     unsigned long id;
     int client_status;
     std::string q_msg;
