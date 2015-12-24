@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "server.h"
 #include <algorithm>
 int main(int argc, char* argv[])

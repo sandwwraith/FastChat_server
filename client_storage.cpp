@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "client_storage.h"
 
 

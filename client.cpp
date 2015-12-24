@@ -1,6 +1,6 @@
+#include "stdafx.h"
 #include "client.h"
-#include <iostream>
-#include <thread>
+
 
 
 Client* Client::get_companion() const

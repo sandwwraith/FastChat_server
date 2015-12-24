@@ -1,5 +1,5 @@
+#include "stdafx.h"
 #include "server.h"
-#include <thread>
 
 
 DWORD server::WorkerThread(LPVOID param)

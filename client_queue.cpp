@@ -1,4 +1,8 @@
+#include "stdafx.h"
 #include "client_queue.h"
+
+#include <random>
+#include <chrono>
 
 void client_queue::unlock()
 {
