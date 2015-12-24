@@ -13,6 +13,27 @@
 
 #pragma comment(lib,"Ws2_32.lib")
 
+struct server_launch_params
+{
+    sockaddr_in serv_address;
+
+    explicit server_launch_params(bool global)
+    {
+        if (global)
+            serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
+        else
+            serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+        serv_address.sin_family = AF_INET;
+        serv_address.sin_port = htons(2539);
+    }
+
+    void set_port(int port)
+    {
+        serv_address.sin_port = htons(port);
+    }
+};
+
 class server
 {
     //Global parameter for server address/port
@@ -32,18 +53,7 @@ class server
 
     //Number of threads per processor
     int g_worker_threads_per_processor = 2;
-public:
-    int get_worker_threads_per_processor() const;
-    bool set_worker_threads_per_processor(int g_worker_threads_per_processor1);
 
-    //Returns true if port was setted (false if server already started)
-    bool set_port(int new_port);
-    int get_port() const;
-
-    bool is_addr_global() const;
-    bool set_global_addr(bool set_to_global);
-
-private:
     //Main IOCP port
     HANDLE g_io_completion_port;
 
@@ -52,31 +62,26 @@ private:
     client_storage g_client_storage;
 
     static DWORD WINAPI WorkerThread(LPVOID); //Worker function for threads
-    bool g_started = false;
+    bool init();
+    void shutdown();
 
-    SOCKET create_listen_socket();
+    SOCKET create_listen_socket(server_launch_params);
     SOCKET listenSock;
 
     OVERLAPPED* overlapped_ac;
     char* accept_buf;
     Client* lastAccepted = nullptr;
+    Client* acceptContext = nullptr;
 
     bool accept();
     unsigned long ids = 0;
 
-    void drop_client(Client* cl);
+    void drop_client(Client*);
 public:
 
     int get_proc_count();
     unsigned int clients_count() const;
-    server();
-    //if init_now is true, inits server immedeately
-    explicit server(bool init_now);
-    bool init();
-
-    int start();
-
-    void shutdown();
+    explicit server(server_launch_params);
     ~server();
 };
 

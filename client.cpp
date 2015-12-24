@@ -38,7 +38,7 @@ void Client::set_companion(Client* cmp)
 
 char* Client::get_recv_buffer_data()
 {
-    return buffer.recv_buf->buf;
+    return buffer.recv_buf.buf;
 }
 
 bool Client::recieve()
@@ -46,7 +46,7 @@ bool Client::recieve()
     std::cout << id << " receiving...(#" << std::this_thread::get_id() << std::endl;
     DWORD dwBytes = 0, dwFlags = 0;
     buffer.reset_recv_buf();
-    int snd = WSARecv(this->socket, buffer.recv_buf, 1, &dwBytes, &dwFlags, overlapped_recv, nullptr);
+    int snd = WSARecv(this->socket, &buffer.recv_buf, 1, &dwBytes, &dwFlags, overlapped_recv, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
@@ -82,7 +82,7 @@ bool Client::send(std::string const & message)
     buffer.fill_send_buf(message);
     DWORD dwBytes = 0;
     DWORD dwFlags = 0;
-    auto snd = WSASend(this->socket, buffer.send_buf, 1, &dwBytes, dwFlags, overlapped_send, nullptr);
+    auto snd = WSASend(this->socket, &buffer.send_buf, 1, &dwBytes, dwFlags, overlapped_send, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
 }
 
@@ -98,12 +98,12 @@ void Client::unlock()
 
 int Client::get_snd_message_type() const
 {
-    return this->buffer.send_buf->buf[1];
+    return this->buffer.send_buf.buf[1];
 }
 
 int Client::get_recv_message_type() const
 {
-    return this->buffer.recv_buf->buf[1];
+    return this->buffer.recv_buf.buf[1];
 }
 
 SOCKET Client::get_socket()

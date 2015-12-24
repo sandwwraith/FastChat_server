@@ -7,7 +7,7 @@ DWORD server::WorkerThread(LPVOID param)
     server* me = static_cast<server*>(param);
     void* context = nullptr;
     OVERLAPPED* overlapped = nullptr;
-    OVERLAPPED_EX* overlapped_ex = nullptr;
+    OVERLAPPED_EX* overlapped_ex;
     DWORD dwBytesTransfered = 0;
 
     while (true)
@@ -23,7 +23,7 @@ DWORD server::WorkerThread(LPVOID param)
             }
             if(err_code == ERROR_CONNECTION_ABORTED) //Deleted socket
             {
-                delete overlapped_ex;
+                delete overlapped;
             }
             continue;
         }
@@ -267,46 +267,38 @@ bool server::accept()
 
     Client* cl = new Client(acc_socket);
     cl->id = ids++;
+    this->lastAccepted = cl;
     HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)cl, 0);
     if (port == nullptr)
     {
         std::cout << "Can't bind new client to comp port: " << GetLastError() << std::endl;
+        this->lastAccepted = nullptr;
+        delete cl;
         return false;
     }
-    this->lastAccepted = cl;
     return true;
 }
 
-SOCKET server::create_listen_socket()
+SOCKET server::create_listen_socket(server_launch_params params)
 {
     //Creating overlapped socket
     SOCKET sock = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
     if (sock == INVALID_SOCKET)
     {
-        std::cout << "Error opening socket\n";
+        std::cout << "Error opening socket"<< WSAGetLastError() << std::endl;
         return INVALID_SOCKET;
     }
 
-    sockaddr_in serv_address;
-
-    if (global_addr)
-        serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
-    else 
-        serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    serv_address.sin_family = AF_INET;
-    serv_address.sin_port = htons(g_server_port);
-
-    int res = bind(sock, reinterpret_cast<sockaddr*>(&serv_address), sizeof(serv_address));
+    int res = bind(sock, reinterpret_cast<sockaddr*>(&params.serv_address), sizeof(params.serv_address));
     if (res == SOCKET_ERROR)
     {
-        std::cout << "bind error\n";
+        std::cout << "Bind error" << WSAGetLastError() << std::endl;
         closesocket(sock);
         return INVALID_SOCKET;
     }
     if (listen(sock, SOMAXCONN) == SOCKET_ERROR)
     {
-        printf("Listen failed with error: %d\n", WSAGetLastError());
+        std::cout << "Listen failed with error:" << WSAGetLastError() << std::endl;
         closesocket(sock);
         return INVALID_SOCKET;
     }
@@ -355,6 +347,7 @@ bool server::init()
     if (g_io_completion_port == nullptr)
     {
         printf("IOCompletionPort init failed: %d\n", WSAGetLastError());
+        WSACleanup();
         return false;
     }
 
@@ -372,32 +365,7 @@ bool server::init()
     {
         g_worker_threads[i] = CreateThread(nullptr, 0, WorkerThread, this, 0, nullptr);
     }
-    g_started = true;
     return true;
-}
-
-int server::start()
-{
-    if (!g_started && !init())
-    {
-        std::cout << "Failed to init\n";
-        return 1;
-    }
-    listenSock = create_listen_socket();
-    if (listenSock == INVALID_SOCKET)
-    {
-        std::cout << "Failed to create listen socket\n";
-        shutdown();
-        return 1;
-    }
-
-    Client* dummy = new Client(INVALID_SOCKET);
-    dummy->client_status = DUMMY;
-    CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)dummy, 0);
-    this->accept();
-
-    std::cout << "All OK, waiting for the connections" << std::endl;
-    return 0;
 }
 
 void server::shutdown()
@@ -413,64 +381,42 @@ void server::shutdown()
     WaitForMultipleObjects(g_workers_count, g_worker_threads, true, INFINITE);
     g_client_storage.clear_all();
     CloseHandle(g_io_completion_port);
+    closesocket(listenSock);
     delete[] g_worker_threads;
     WSACleanup();
-    g_started = false;
 }
 
-int server::get_worker_threads_per_processor() const
-{
-    return g_worker_threads_per_processor;
-}
-
-bool server::set_worker_threads_per_processor(int g_worker_threads_per_processor1)
-{
-    if (g_started) return false;
-    g_worker_threads_per_processor = g_worker_threads_per_processor1;
-    return true;
-}
-
-bool server::set_port(int new_port)
-{
-    if (g_started) return false;
-    g_server_port = new_port;
-    return true;
-}
-
-bool server::is_addr_global() const
-{
-    return global_addr;
-}
-
-bool server::set_global_addr(bool set_to_global)
-{
-    if (g_started) return false;
-    global_addr = set_to_global;
-    return true;
-}
-
-int server::get_port() const
-{
-    return g_server_port;
-}
-
-server::server() : server(false)
-{
-}
-
-server::server(bool init_now)
+server::server(server_launch_params params)
 {
     overlapped_ac = new OVERLAPPED{};
     accept_buf = static_cast<char*>(malloc(sizeof(char)*(2 * sizeof(sockaddr_in) + 32)));
-    if (init_now)
+    if (!init()) throw std::runtime_error("Error in initializing");
+    listenSock = create_listen_socket(params);
+    if (listenSock == INVALID_SOCKET)
     {
-        g_started = init();
+        std::cout << "Failed to create listen socket\n";
+        shutdown();
+        throw std::runtime_error("Cannot create listen socket");
     }
+
+    acceptContext = new Client(INVALID_SOCKET);
+    acceptContext->client_status = DUMMY;
+    CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)acceptContext, 0);
+    if (!this->accept())
+    {
+        delete acceptContext;
+        shutdown();
+        throw std::exception("Cannot accept");
+    }
+
+    std::cout << "All OK, waiting for the connections" << std::endl;
 }
 
 server::~server()
 {
-    if (g_started) shutdown();
+    shutdown();
+    delete acceptContext;
+    delete lastAccepted;
     delete overlapped_ac;
     free(accept_buf);
 }

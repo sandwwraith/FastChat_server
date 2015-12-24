@@ -13,10 +13,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "Launching " << (global ? "global..." : "local...") << std::endl;
-    server serv;
-    serv.set_global_addr(global);
-    serv.init();
-    serv.start();
+    server serv = server(server_launch_params(global));
     std::string s;
 
     while (true)
@@ -24,7 +21,6 @@ int main(int argc, char* argv[])
         std::cin >> s;
         if (s.compare("shutdown") == 0)
         {
-            serv.shutdown();
             break;
         }
         if (s.compare("clients") == 0)
