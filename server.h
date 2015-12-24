@@ -20,14 +20,7 @@ class server
 
     //If true, recieves on INADDR_ANY. localhost otherwise.
     bool global_addr = false;
-public:
-    //Returns true if port was setted (false if server already started)
-    bool set_port(int new_port);
-    int get_port() const;
 
-    bool is_addr_global() const;
-    bool set_global_addr(bool set_to_global);
-private:
     //Global array of worker threads
     HANDLE* g_worker_threads = nullptr;
 
@@ -42,6 +35,13 @@ private:
 public:
     int get_worker_threads_per_processor() const;
     bool set_worker_threads_per_processor(int g_worker_threads_per_processor1);
+
+    //Returns true if port was setted (false if server already started)
+    bool set_port(int new_port);
+    int get_port() const;
+
+    bool is_addr_global() const;
+    bool set_global_addr(bool set_to_global);
 
 private:
     //Main IOCP port

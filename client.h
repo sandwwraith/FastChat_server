@@ -1,9 +1,8 @@
 #pragma once
 #include <WinSock2.h>
 #include <string>
-#include<atomic>
-//Maximum buffer size for I/O Operations
-#define MAX_BUFFER_SIZE 256
+
+#include "client_buffer.h"
 
 //Operation codes for clients
 #define OP_SEND 1
@@ -33,52 +32,6 @@ struct OVERLAPPED_EX : OVERLAPPED
     unsigned operation_code;
 };
 
-struct ClientBuffer
-{
-    WSABUF *recv_buf;
-    WSABUF *send_buf;
-
-    ClientBuffer()
-    {
-        recv_buf = new WSABUF;
-        ZeroMemory(recv_buf, sizeof(WSABUF));
-        recv_buf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
-        recv_buf->len = MAX_BUFFER_SIZE;
-
-        send_buf = new WSABUF;
-        ZeroMemory(send_buf, sizeof(WSABUF));
-        send_buf->buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
-        send_buf->len = MAX_BUFFER_SIZE;
-    }
-
-    ~ClientBuffer()
-    {
-        free(recv_buf->buf);
-        free(send_buf->buf);
-
-        delete send_buf;
-        delete recv_buf;
-    }
-
-    void reset_snd_buf()
-    {
-        ZeroMemory(send_buf->buf, MAX_BUFFER_SIZE);
-        send_buf->len = MAX_BUFFER_SIZE;
-    }
-
-    void reset_recv_buf()
-    {
-        ZeroMemory(recv_buf->buf, MAX_BUFFER_SIZE);
-        recv_buf->len = MAX_BUFFER_SIZE;
-    }
-
-    void fill_send_buf(std::string const& message)
-    {
-        this->reset_snd_buf();
-        CopyMemory(send_buf->buf, message.c_str(), message.length());
-        send_buf->len = message.length();
-    }
-};
 class Client
 {
     //Field, necessary for overlapped (async) operations
@@ -87,7 +40,7 @@ class Client
 
     //Buffer with data
     //WSABUF *wsabuf;
-    ClientBuffer buffer;
+    CLIENT_BUFFER buffer;
 
     //Socket of client
     SOCKET socket;

@@ -153,6 +153,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client.h" />
+    <ClInclude Include="client_buffer.h" />
     <ClInclude Include="client_queue.h" />
     <ClInclude Include="client_storage.h" />
     <ClInclude Include="server.h" />
