@@ -33,8 +33,15 @@ Client* client_queue::pop()
 {
     if (q.size() < 1) return nullptr;
     std::lock_guard<std::mutex> guard(sec);
-    Client* res = q.front();
-    q.pop_front();
+    Client* res;
+    try 
+    {
+        res = q.front();
+        q.pop_front();
+    } catch(...)
+    {
+        return nullptr;
+    }
     /*this->unlock();*/
     sec.unlock();
     return res;

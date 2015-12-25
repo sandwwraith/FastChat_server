@@ -41,7 +41,7 @@ char* Client::get_recv_buffer_data()
     return buffer.recv_buf.buf;
 }
 
-bool Client::recieve()
+bool Client::recieve() noexcept
 {
     std::cout << id << " receiving...(#" << std::this_thread::get_id() << std::endl;
     DWORD dwBytes = 0, dwFlags = 0;
@@ -75,7 +75,7 @@ bool Client::send_leaved()
     return send(s);
 }
 
-bool Client::send(std::string const & message)
+bool Client::send(std::string const & message) noexcept
 {
     std::cout << id << " sending...(#" << std::this_thread::get_id() << std::endl;
      
@@ -84,6 +84,17 @@ bool Client::send(std::string const & message)
     DWORD dwFlags = 0;
     auto snd = WSASend(this->socket, &buffer.send_buf, 1, &dwBytes, dwFlags, overlapped_send, nullptr);
     return !(snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError());
+}
+
+bool Client::safe_comp_send(std::string const& msg) noexcept
+{
+    if (this->own_companion())
+    {
+        get_companion()->send(msg);
+        this->unlock();
+        return true;
+    }
+    return false;
 }
 
 void Client::lock()

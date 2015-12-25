@@ -74,9 +74,10 @@ class server
     Client* acceptContext = nullptr;
 
     bool accept();
+    void finish_accept() noexcept;
     unsigned long ids = 0;
 
-    void drop_client(Client*);
+    void drop_client(Client*) noexcept;
 public:
 
     int get_proc_count();

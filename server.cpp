@@ -35,23 +35,7 @@ DWORD server::WorkerThread(LPVOID param)
         if (client->client_status == DUMMY)
         {
             if (me->lastAccepted != nullptr) {
-                std::cout << "Accept successfull, id:" << me->lastAccepted->id << std::endl;
-
-               int res = setsockopt(me->lastAccepted->get_socket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
-                    (char*)&(me->listenSock), sizeof(me->listenSock));
-                if (res == SOCKET_ERROR)
-                {
-                    std::cout << "Set sock opt failed: " << WSAGetLastError() << std::endl;
-                }
-
-                me->g_client_storage.attach_client(me->lastAccepted);
-                if (!me->lastAccepted->send_greetings(me->g_client_storage.clients_count()))
-                {
-                    std::cout << "Error in inital send, drop client " << me->lastAccepted->id << std::endl;
-                    me->drop_client(me->lastAccepted);
-                }
-                me->lastAccepted = nullptr;
-                me->accept();
+                me->finish_accept();
             }
             else
             {
@@ -233,6 +217,43 @@ DWORD server::WorkerThread(LPVOID param)
     }
 }
 
+void server::finish_accept() noexcept
+{
+    try {
+        std::cout << "Accept finishing, id:" << this->lastAccepted->id << std::endl;
+
+        int res = setsockopt(this->lastAccepted->get_socket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+            (char*)&(this->listenSock), sizeof(this->listenSock));
+        if (res == SOCKET_ERROR)
+        {
+            std::cout << "Set sock opt failed: " << WSAGetLastError() << std::endl;
+        }
+
+        try 
+        {
+            this->g_client_storage.attach_client(this->lastAccepted);
+        } 
+        catch (std::exception&)
+        {
+            delete this->lastAccepted;
+            throw;
+        }
+        if (!this->lastAccepted->send_greetings(this->g_client_storage.clients_count()))
+        {
+            std::cout << "Error in inital send, drop client " << this->lastAccepted->id << std::endl;
+            this->drop_client(this->lastAccepted);
+        }
+        this->lastAccepted = nullptr;
+        if (!this->accept()) throw std::exception("Can't start accept, WSA code" + WSAGetLastError());
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << "Fatal accept error: " << ex.what() << std::endl;
+        //WAT TO DO ???
+    }
+}
+
+
 bool server::accept()
 {
     GUID GuidAcceptEx = WSAID_ACCEPTEX;
@@ -310,12 +331,20 @@ unsigned server::clients_count() const
     return g_client_storage.clients_count();
 }
 
-void server::drop_client(Client* cl)
+void server::drop_client(Client* cl) noexcept
 {
     if (cl == nullptr) return;
-    if (cl->q_msg.size() > 0) g_client_queue.remove(cl);
-    if (cl->has_companion()) cl->get_companion()->delete_companion();
-    g_client_storage.detach_client(cl);
+    try 
+    {
+        if (cl->q_msg.size() > 0) g_client_queue.remove(cl);
+        if (cl->has_companion()) cl->get_companion()->delete_companion();
+        g_client_storage.detach_client(cl);
+    }
+    catch (std::exception const& ex)
+    {
+        std::cout << "Fatal DROP Error: " << ex.what() << std::endl;
+        delete cl;
+    }
     return;
 }
 

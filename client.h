@@ -63,8 +63,9 @@ public:
     SOCKET get_socket();
 
     //Remember, this will reset your buffer
-    bool recieve();
-    bool send(std::string const&);
+    bool recieve() noexcept;
+    bool send(std::string const&) noexcept;
+    bool safe_comp_send(std::string const&) noexcept;
 
     bool send_leaved();
     bool send_bad_vote();
