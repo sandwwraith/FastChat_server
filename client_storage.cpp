@@ -4,17 +4,14 @@
 
 void client_storage::attach_client(Client* cl)
 {
-    EnterCriticalSection(&cs_clientList);
-
+    std::lock_guard<std::mutex> guard{ cs_clientList };
     storage.push_back(cl);
 
-    LeaveCriticalSection(&cs_clientList);
 }
 
 void client_storage::detach_client(Client* cl)
 {
-    EnterCriticalSection(&cs_clientList);
-
+    std::lock_guard<std::mutex> guard{ cs_clientList };
     for (auto it = storage.begin(), end = storage.end(); it != end; ++it)
     {
         if (cl == *it)
@@ -24,13 +21,11 @@ void client_storage::detach_client(Client* cl)
             break;
         }
     }
-
-    LeaveCriticalSection(&cs_clientList);
 }
 
 void client_storage::clear_all()
 {
-    EnterCriticalSection(&cs_clientList);
+    std::lock_guard<std::mutex> guard{ cs_clientList };
 
     for (auto it = storage.begin(), end = storage.end(); it != end; ++it)
     {
@@ -38,7 +33,6 @@ void client_storage::clear_all()
     }
     storage.clear();
 
-    LeaveCriticalSection(&cs_clientList);
 }
 
 std::list<Client*> const& client_storage::watch_clients() const
@@ -53,12 +47,10 @@ unsigned int client_storage::clients_count() const
 
 client_storage::client_storage()
 {
-    InitializeCriticalSection(&cs_clientList);
 }
 
 
 client_storage::~client_storage()
 {
     clear_all();
-    DeleteCriticalSection(&cs_clientList);
 }

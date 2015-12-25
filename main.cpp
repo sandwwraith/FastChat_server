@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "Launching " << (global ? "global..." : "local...") << std::endl;
-    server serv = server(server_launch_params(global));
+    server serv{server_launch_params(global)};
     std::string s;
 
     while (true)

@@ -4,7 +4,6 @@
 
 //Maximum buffer size for I/O Operations
 #define MAX_BUFFER_SIZE 256
-#include <utility>
 
 struct CLIENT_BUFFER
 {
@@ -17,9 +16,11 @@ struct CLIENT_BUFFER
     CLIENT_BUFFER()
     {
         recv_buf.buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
+        if (recv_buf.buf == nullptr) throw std::runtime_error("Memory error at buffer init");
         recv_buf.len = MAX_BUFFER_SIZE;
 
         send_buf.buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
+        if (send_buf.buf == nullptr) throw std::runtime_error("Memory error at buffer init");
         send_buf.len = MAX_BUFFER_SIZE;
     }
 
@@ -41,11 +42,11 @@ struct CLIENT_BUFFER
         recv_buf.len = MAX_BUFFER_SIZE;
     }
 
-    void fill_send_buf(std::string const& message)
+    void fill_send_buf(std::string const& message) noexcept
     {
-        this->reset_snd_buf();
-        assert(message.length() < MAX_BUFFER_SIZE);
-        CopyMemory(send_buf.buf, message.c_str(), message.length());
-        send_buf.len = message.length();
+        //this->reset_snd_buf();
+        ULONG len = min(message.length(), MAX_BUFFER_SIZE);
+        CopyMemory(send_buf.buf, message.c_str(), len);
+        send_buf.len = len;
     }
 };

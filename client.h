@@ -77,6 +77,8 @@ public:
     void unlock();
 
     explicit Client(SOCKET s);
+    Client(const Client& other) = delete;
+    Client& operator=(const Client& other) = delete;
     ~Client();
 };
 
