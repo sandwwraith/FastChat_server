@@ -2,14 +2,14 @@
 #include "client_storage.h"
 
 
-void client_storage::attach_client(Client* cl)
+void client_storage::attach_client(client_context* cl)
 {
     std::lock_guard<std::mutex> guard{ cs_clientList };
     storage.push_back(cl);
 
 }
 
-void client_storage::detach_client(Client* cl)
+void client_storage::detach_client(client_context* cl)
 {
     std::lock_guard<std::mutex> guard{ cs_clientList };
     for (auto it = storage.begin(), end = storage.end(); it != end; ++it)
@@ -35,7 +35,7 @@ void client_storage::clear_all()
 
 }
 
-std::list<Client*> const& client_storage::watch_clients() const
+std::list<client_context*> const& client_storage::watch_clients() const
 {
     return storage;
 }

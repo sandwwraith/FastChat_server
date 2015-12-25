@@ -1,39 +1,52 @@
 #include "stdafx.h"
 #include "client.h"
 
+//Client* Client::get_companion() const
+//{
+//    return companion;
+//}
+//
+//void Client::delete_companion()
+//{
+//    this->lock();
+//    companion = (nullptr);
+//    this->unlock();
+//}
+//
+//bool Client::own_companion()
+//{
+//    this->lock();
+//    if (this->has_companion())
+//    {
+//        return true;
+//    }
+//    this->unlock();
+//    return false;
+//}
+//
+//bool Client::has_companion()
+//{
+//    return companion!=nullptr;
+//}
+//
+//void Client::set_companion(Client* cmp)
+//{
+//    companion = cmp;
+//}
 
-
-Client* Client::get_companion() const
+std::weak_ptr<Client>& Client::get_companion()
 {
     return companion;
 }
 
-void Client::delete_companion()
+void Client::set_companion(std::weak_ptr<Client> const& c)
 {
-    this->lock();
-    companion = (nullptr);
-    this->unlock();
+    companion = c;
 }
 
-bool Client::own_companion()
+bool Client::has_companion() const
 {
-    this->lock();
-    if (this->has_companion())
-    {
-        return true;
-    }
-    this->unlock();
-    return false;
-}
-
-bool Client::has_companion()
-{
-    return companion!=nullptr;
-}
-
-void Client::set_companion(Client* cmp)
-{
-    companion = cmp;
+    return !companion.expired();
 }
 
 char* Client::get_recv_buffer_data()
@@ -88,10 +101,17 @@ bool Client::send(std::string const & message) noexcept
 
 bool Client::safe_comp_send(std::string const& msg) noexcept
 {
-    if (this->own_companion())
+    /*if (this->own_companion())
     {
         get_companion()->send(msg);
         this->unlock();
+        return true;
+    }
+    return false;*/
+    auto comp = companion.lock();
+    if (comp.operator bool())
+    {
+        comp->send(msg);
         return true;
     }
     return false;

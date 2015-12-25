@@ -47,17 +47,21 @@ class Client
 
     CRITICAL_SECTION cl_sec;
 
-    Client* companion = nullptr;    
+    //Client* companion = nullptr;    
+    std::weak_ptr<Client> companion;
 public:
     unsigned long id;
     int client_status;
     std::string q_msg;
 
-    Client* get_companion() const;
+    /*Client* get_companion() const;
     void set_companion(Client*);
     void delete_companion();
     bool has_companion();
-    bool own_companion();
+    bool own_companion();*/
+    std::weak_ptr<Client> &get_companion();
+    void set_companion(std::weak_ptr<Client>const&);
+    bool has_companion() const;
 
     char* get_recv_buffer_data();
     SOCKET get_socket();
@@ -81,5 +85,13 @@ public:
     Client(const Client& other) = delete;
     Client& operator=(const Client& other) = delete;
     ~Client();
+};
+
+struct client_context
+{
+    std::shared_ptr<Client> ptr;
+    char dummy;
+    client_context(Client* a) :ptr(a), dummy(0) {};
+    client_context() : dummy(1) {};
 };
 

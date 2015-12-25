@@ -5,21 +5,21 @@
 DWORD server::WorkerThread(LPVOID param)
 {
     server* me = static_cast<server*>(param);
-    void* context = nullptr;
+    void* void_context = nullptr;
     OVERLAPPED* overlapped = nullptr;
     OVERLAPPED_EX* overlapped_ex;
     DWORD dwBytesTransfered = 0;
 
     while (true)
     {
-        BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&context, &overlapped, INFINITE);
+        BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&void_context, &overlapped, INFINITE);
         if (!queued_result)
         {
             auto err_code = GetLastError();
             std::cout << "Error dequeing: " << err_code << std::endl; //121 = ERROR_SEM_TIMEOUT; 64 - NET_NAME_INVALID, need to delete client
             if (err_code == ERROR_SEM_TIMEOUT || err_code == ERROR_NETNAME_DELETED)
             {
-                me->drop_client(static_cast<Client*>(context));
+                me->drop_client(static_cast<client_context*>(void_context));
             }
             if(err_code == ERROR_CONNECTION_ABORTED) //Deleted socket
             {
@@ -27,12 +27,13 @@ DWORD server::WorkerThread(LPVOID param)
             }
             continue;
         }
-        if (context == nullptr) //Signal to shutdown
+
+        if (void_context == nullptr) //Signal to shutdown
         {
             return 0;
         }
-        Client* client = static_cast<Client*>(context);
-        if (client->client_status == DUMMY)
+        client_context* context = static_cast<client_context*>(void_context);
+        if (context->dummy)
         {
             if (me->lastAccepted != nullptr) {
                 me->finish_accept();
@@ -43,13 +44,22 @@ DWORD server::WorkerThread(LPVOID param)
             }
             continue;
         }
+        auto client = context->ptr;
         if (dwBytesTransfered == 0) //Client dropped connection
         {
             std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;
-            me->drop_client(client);
+            me->drop_client(context);
             continue;
         }
         overlapped_ex = static_cast<OVERLAPPED_EX*>(overlapped);
+
+        if (overlapped_ex->operation_code == OP_RECV && client->get_recv_message_type() == MST_DISCONNECT)
+        {
+            std::cout << client->id << " send disconnect" << std::endl;
+            me->drop_client(context);
+            continue;
+        }
+
         switch (client->client_status)
         {
         case STATE_NEW:
@@ -60,7 +70,7 @@ DWORD server::WorkerThread(LPVOID param)
             {
                 std::cout << "Error occurred while executing WSARecv: " << WSAGetLastError() << std::endl;
                 //Let's not work with this client
-                me->drop_client(client);
+                me->drop_client(context);
                 break;
             }
 
@@ -69,12 +79,12 @@ DWORD server::WorkerThread(LPVOID param)
             //In this state, client may ask to queue him (OP_RECV) or to get pair (OP_SEND)
             if (overlapped_ex->operation_code == OP_RECV)
             {
-                if (client->get_recv_message_type() == MST_DISCONNECT)
+                /*if (client->get_recv_message_type() == MST_DISCONNECT)
                 {
                     std::cout << client->id << " send disconnect" << std::endl;
-                    me->drop_client(client);
+                    me->drop_client(context);
                     break;
-                }
+                }*/
                 if (client->get_recv_message_type() != MST_QUEUE || client->q_msg.size() > 0)
                 {
                     client->recieve(); // If you ignore it, maybe it will go away
@@ -82,22 +92,23 @@ DWORD server::WorkerThread(LPVOID param)
                 }
 
                 //Making a pair for our client
-                if (me->g_client_queue.size() >= 1)
-                {
-                    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
-                    std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
-                    me->g_client_queue.make_pair(client);
-                    //Send them info
-                    client->send(client->get_companion()->q_msg);
-                    client->get_companion()->send(client->q_msg); //TODO: rework this also to own_companion
-                }
-                else
-                {
-                    //Enqueue user
-                    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
-                    std::cout << client->id << "Q_MSG:"<<client->q_msg<<std::endl;
-                    me->g_client_queue.push(client);
-                }
+                me->handle_queue_request(client, dwBytesTransfered);
+                //if (me->g_client_queue.size() >= 1)
+                //{
+                //    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
+                //    std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
+                //    me->g_client_queue.make_pair(client);
+                //    //Send them info
+                //    client->send(client->get_companion()->q_msg);
+                //    client->get_companion()->send(client->q_msg); //TODO: rework this also to own_companion
+                //}
+                //else
+                //{
+                //    //Enqueue user
+                //    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
+                //    std::cout << client->id << "Q_MSG:"<<client->q_msg<<std::endl;
+                //    me->g_client_queue.push(client);
+                //}
                 client->recieve(); //Client may wish to disconnect
             }
             else
@@ -106,7 +117,7 @@ DWORD server::WorkerThread(LPVOID param)
                 //Change only one client, 'cause we'll got two SEND complete statuses
                 if (client->get_snd_message_type()== MST_QUEUE)
                 {
-                    client->get_companion()->q_msg.resize(0);
+                    client->q_msg.resize(0);
                     client->client_status = STATE_MESSAGING;
                 }
             }
@@ -125,19 +136,19 @@ DWORD server::WorkerThread(LPVOID param)
                     client->client_status = STATE_VOTING;
                 if (client->get_recv_message_type() == MST_LEAVE)
                     client->client_status = STATE_INIT;
-                if (client->get_recv_message_type() == MST_DISCONNECT)
+                /*if (client->get_recv_message_type() == MST_DISCONNECT)
                 {
                     std::cout << client->id << " send disconnect" << std::endl;
-                    me->drop_client(client);
+                    me->drop_client(context);
                     break;
-                }
-                if (client->own_companion())
+                }*/
+                /*if (client->own_companion())
                 {
                     if (client->get_companion()->client_status == STATE_MESSAGING)
                         client->get_companion()->send(msg);
                     client->unlock();
-                }
-                else
+                }*/
+                if (!client->safe_comp_send(msg))
                 {
                     //Handling UNEXPECTEDLY leave
                     client->send_leaved();
@@ -166,53 +177,59 @@ DWORD server::WorkerThread(LPVOID param)
                 }
                 std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " voted " << msg << std::endl;
-                if (client->own_companion())
+                /*if (client->own_companion())
                 {
                     client->get_companion()->send(msg);
                     client->unlock();
                 }
-                else
+                else*/
+                /*if (!client->safe_comp_send(msg))
                 {
-                    client->client_status = STATE_FINISHED;
+                    client->client_status = STATE_INIT;
                     client->send_bad_vote();
                     break;
                 }
 
-                client->client_status = STATE_FINISHED;
+                client->client_status = STATE_INIT;
+                client->recieve();*/
+                client->client_status = STATE_INIT;
+                if (!client->safe_comp_send(msg)) client->send_bad_vote();
+                client->set_companion(std::weak_ptr<Client>());
+                client->recieve();
             }
             else
             {
-                //If this client received, but didn't voted itself
-
-                client->client_status = STATE_FINISHED;
+                //If this client received, and last send message was vote message
+                /*if (client->get_snd_message_type() == MST_VOTING)
+                client->client_status = STATE_FINISHED;*/
             }
 
             break;
-        case STATE_FINISHED:
-            //In this state, client who send first, received pair message and resets
-            //Client who send second delivers his message to first and also resets
+        //case STATE_FINISHED:
+        //    //In this state, client who send first, received pair message and resets
+        //    //Client who send second delivers his message to first and also resets
 
-            if (overlapped_ex->operation_code == OP_RECV)
-            {
-                std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
-                std::cout << client->id << " voted " << msg << std::endl;
-                if (client->own_companion())
-                {
-                    client->get_companion()->send(msg);
-                    client->unlock();
-                }
-                else
-                {
-                    //.... nothing to do, actually.
-                }
-            }
+        //    if (overlapped_ex->operation_code == OP_RECV)
+        //    {
+        //        std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
+        //        std::cout << client->id << " voted " << msg << std::endl;
+        //        if (client->own_companion())
+        //        {
+        //            client->get_companion()->send(msg);
+        //            client->unlock();
+        //        }
+        //        else
+        //        {
+        //            //.... nothing to do, actually.
+        //        }
+        //    }
 
-            //Client may want to find another pair
-            client->set_companion(nullptr);
-            client->client_status = STATE_INIT;
-            client->recieve();
+        //    //Client may want to find another pair
+        //    client->set_companion(nullptr);
+        //    client->client_status = STATE_INIT;
+        //    client->recieve();
 
-            break;
+        //    break;
         }
     }
 }
@@ -220,9 +237,11 @@ DWORD server::WorkerThread(LPVOID param)
 void server::finish_accept() noexcept
 {
     try {
-        std::cout << "Accept finishing, id:" << this->lastAccepted->id << std::endl;
+        auto accepted = this->lastAccepted->ptr;
+        if (!accepted) throw std::runtime_error("Fatal error: contex doesn't contain a client");
+        std::cout << "Accept finishing, id:" << accepted->id << std::endl;
 
-        int res = setsockopt(this->lastAccepted->get_socket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+        int res = setsockopt(accepted->get_socket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
             (char*)&(this->listenSock), sizeof(this->listenSock));
         if (res == SOCKET_ERROR)
         {
@@ -238,9 +257,9 @@ void server::finish_accept() noexcept
             delete this->lastAccepted;
             throw;
         }
-        if (!this->lastAccepted->send_greetings(this->g_client_storage.clients_count()))
+        if (!accepted->send_greetings(this->g_client_storage.clients_count()))
         {
-            std::cout << "Error in inital send, drop client " << this->lastAccepted->id << std::endl;
+            std::cout << "Error in inital send, drop client " << accepted->id << std::endl;
             this->drop_client(this->lastAccepted);
         }
         this->lastAccepted = nullptr;
@@ -288,8 +307,8 @@ bool server::accept()
 
     Client* cl = new Client(acc_socket);
     cl->id = ids++;
-    this->lastAccepted = cl;
-    HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)cl, 0);
+    this->lastAccepted = new client_context(cl);
+    HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)this->lastAccepted, 0);
     if (port == nullptr)
     {
         std::cout << "Can't bind new client to comp port: " << GetLastError() << std::endl;
@@ -331,13 +350,13 @@ unsigned server::clients_count() const
     return g_client_storage.clients_count();
 }
 
-void server::drop_client(Client* cl) noexcept
+void server::drop_client(client_context* cl) noexcept
 {
     if (cl == nullptr) return;
     try 
     {
-        if (cl->q_msg.size() > 0) g_client_queue.remove(cl);
-        if (cl->has_companion()) cl->get_companion()->delete_companion();
+        /*if (cl->q_msg.size() > 0) g_client_queue.remove(cl);
+        if (cl->has_companion()) cl->get_companion()->delete_companion();*/
         g_client_storage.detach_client(cl);
     }
     catch (std::exception const& ex)
@@ -346,6 +365,22 @@ void server::drop_client(Client* cl) noexcept
         delete cl;
     }
     return;
+}
+
+void server::handle_queue_request(std::shared_ptr<Client> const& client, DWORD dwBytesTransfered)
+{
+    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
+    std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
+
+    auto pair = g_client_queue.pair_or_queue(client);
+    if (pair)
+    {
+        //Pair found
+        std::string msg1{ std::move(client->q_msg) };
+        std::string msg2{ std::move(pair->q_msg) }; //Caching strings
+        client->send(msg2);
+        pair->send(msg1);
+    }
 }
 
 int server::get_proc_count()
@@ -428,8 +463,7 @@ server::server(server_launch_params params)
         throw std::runtime_error("Cannot create listen socket");
     }
 
-    acceptContext = new Client(INVALID_SOCKET);
-    acceptContext->client_status = DUMMY;
+    acceptContext = new client_context();
     CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)acceptContext, 0);
     if (!this->accept())
     {

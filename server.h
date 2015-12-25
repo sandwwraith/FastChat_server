@@ -8,7 +8,6 @@
 #include <conio.h>
 
 #include "client_queue.h"
-#include "client.h"
 #include "client_storage.h"
 
 #pragma comment(lib,"Ws2_32.lib")
@@ -70,14 +69,16 @@ class server
 
     OVERLAPPED* overlapped_ac;
     char* accept_buf;
-    Client* lastAccepted = nullptr;
-    Client* acceptContext = nullptr;
+    client_context* lastAccepted = nullptr;
+    client_context* acceptContext = nullptr;
 
     bool accept();
     void finish_accept() noexcept;
     unsigned long ids = 0;
 
-    void drop_client(Client*) noexcept;
+    void drop_client(client_context*) noexcept;
+
+    void handle_queue_request(std::shared_ptr<Client>const&, DWORD);
 public:
 
     int get_proc_count();
