@@ -5,14 +5,17 @@
 #include "client_buffer.h"
 
 //Operation codes for clients
-//Server sends data to client
-#define OP_SEND 1
-//Server recievs data
-#define OP_RECV 2
-//Special codes
-#define OP_KEEP_ALIVE 10
-#define OP_ACCEPT 11
-#define OP_DELETED 12
+enum class operation_code : unsigned
+{
+    //Server sends data to client
+    SEND       = 1,
+    //Server recievs data
+    RECV       = 2,
+    //Special codes
+    KEEP_ALIVE = 10,
+    ACCEPT     = 11,
+    DELETED    = 12,
+};
 
 //Client statuses
 #define STATE_NEW 0
@@ -38,9 +41,9 @@
 
 struct OVERLAPPED_EX : OVERLAPPED
 {
-    unsigned operation_code;
+    operation_code op_code;
 
-    explicit OVERLAPPED_EX(unsigned code) : OVERLAPPED{}, operation_code(code){};
+    explicit OVERLAPPED_EX(operation_code op_code) : OVERLAPPED{}, op_code(op_code){}
 };
 
 class Client
