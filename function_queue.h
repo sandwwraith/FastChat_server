@@ -25,6 +25,7 @@ class function_queue
     std::mutex mut;
     std::condition_variable cv;
     std::thread runner;
+    bool cancelled = false;
 
     void safe_push(_fq_event const&);
     _fq_event safe_pop();

@@ -59,6 +59,8 @@ DWORD server::WorkerThread(LPVOID param)
             }
             continue;
         }
+        context->updateTimer();
+        auto client = context->ptr;
         //Checking if event is accept
         if (context->dummy)
         {
@@ -72,8 +74,6 @@ DWORD server::WorkerThread(LPVOID param)
             continue;
         }
 
-        context->updateTimer();
-        auto client = context->ptr;
         if (dwBytesTransfered == 0) //Client dropped connection
         {
             std::cout << client->id << " Zero bytes transfered, disconnecting (#" << std::this_thread::get_id() << std::endl;

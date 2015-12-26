@@ -3,9 +3,14 @@
 
 void function_queue::safe_push(_fq_event const& e)
 {
-    std::unique_lock<std::mutex> guard{ mut };
-    event_q.push(e);
-    cv.notify_all();
+    try {
+        std::unique_lock<std::mutex> guard{ mut };
+        event_q.push(e);
+        cv.notify_all();
+    } catch(...)
+    {
+        //Ignore event
+    }
 }
 
 _fq_event function_queue::safe_pop()
@@ -17,10 +22,13 @@ _fq_event function_queue::safe_pop()
 
 void function_queue::worker(function_queue* me)
 {
-    while (true)
+    while (!cancelled)
     {
         std::unique_lock<std::mutex> lck{ me->mut };
-        while (me->event_q.empty()) me->cv.wait(lck);
+        while (me->event_q.empty()) {
+            me->cv.wait(lck);
+            if (cancelled) return;
+        }
 
         auto t = me->event_q.top().at;
         me->cv.wait_until(lck, t);
@@ -41,5 +49,7 @@ function_queue::function_queue()
 
 function_queue::~function_queue()
 {
-    if (runner.joinable()) runner.detach();
+    cancelled = true;
+    cv.notify_all();
+    if (runner.joinable()) runner.join();
 }
