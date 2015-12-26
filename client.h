@@ -5,15 +5,19 @@
 #include "client_buffer.h"
 
 //Operation codes for clients
-//Server sends data to client
-#define OP_SEND 1
-//Server recievs data
-#define OP_RECV 2
-//Special codes
-#define OP_KEEP_ALIVE 10
-#define OP_ACCEPT 11
-#define OP_DELETED 12
+enum class operation_code : unsigned
+{
+    //Server sends data to client
+    SEND       = 1,
+    //Server recievs data
+    RECV       = 2,
+    //Special codes
+    KEEP_ALIVE = 10,
+    ACCEPT     = 11,
+    DELETED    = 12,
+};
 
+// TODO: make them enum
 //Client statuses
 #define STATE_NEW 0
 #define STATE_INIT 1
@@ -29,6 +33,7 @@
 #define MST_DISCONNECT 10
 #define MST_LEAVE 69
 
+// TODO: make const variable
 //Maximum inactivity time in SECONDS
 #ifdef _DEBUG
 #define MAX_IDLENESS_TIME 15
@@ -38,9 +43,9 @@
 
 struct OVERLAPPED_EX : OVERLAPPED
 {
-    unsigned operation_code;
+    operation_code op_code;
 
-    explicit OVERLAPPED_EX(unsigned code) : OVERLAPPED{}, operation_code(code){};
+    explicit OVERLAPPED_EX(operation_code op_code) : OVERLAPPED{}, op_code(op_code){}
 };
 
 class Client
@@ -57,7 +62,7 @@ class Client
     //Socket of client
     SOCKET socket;
 
-    //Client* companion = nullptr;    
+    //Client* companion = nullptr;
     std::weak_ptr<Client> companion;
 public:
     inline OVERLAPPED_EX* get_overlapped()

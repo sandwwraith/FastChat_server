@@ -40,7 +40,7 @@ std::shared_ptr<Client> client_queue::try_pair(std::shared_ptr<Client> const& cl
         client->set_companion(std::weak_ptr<Client>(pair));
         pair->set_companion(std::weak_ptr<Client>(client));
 
-        char theme = distribution.operator()(generator);
+        char theme = distribution(generator);
         client->q_msg[2] = theme;
         pair->q_msg[2] = theme;
         return pair;

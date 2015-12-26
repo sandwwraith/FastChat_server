@@ -3,14 +3,9 @@
 
 void function_queue::safe_push(_fq_event const& e)
 {
-    try {
-        std::unique_lock<std::mutex> guard{ mut };
-        event_q.push(e);
-        cv.notify_all();
-    } catch(...)
-    {
-        //Ignore event
-    }
+    std::unique_lock<std::mutex> guard{ mut };
+    event_q.push(e);
+    cv.notify_one();
 }
 
 _fq_event function_queue::safe_pop()
@@ -31,9 +26,9 @@ void function_queue::worker(function_queue* me)
         }
 
         auto t = me->event_q.top().at;
-        me->cv.wait_until(lck, t);
+        me->cv.wait_until(lck, t); // TODO: wakeup because of push
         auto e = me->safe_pop();
-        e.runnable.operator()();        
+        e.runnable();
     }
 }
 

@@ -1,6 +1,21 @@
 #include "stdafx.h"
 #include "server.h"
 
+namespace
+{
+    int calc_proc_count()
+    {
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        return si.dwNumberOfProcessors;
+    }
+
+    int get_proc_count()
+    {
+        static int const value = calc_proc_count();
+        return value;
+    }
+}
 
 DWORD server::WorkerThread(LPVOID param)
 {
@@ -36,14 +51,14 @@ DWORD server::WorkerThread(LPVOID param)
 
         overlapped_ex = static_cast<OVERLAPPED_EX*>(overlapped);
         //Checking keep-alive
-        if (overlapped_ex->operation_code == OP_DELETED)
+        if (overlapped_ex->op_code == operation_code::DELETED)
         {
             std::cout << "overlapped deleted\n";
             delete overlapped_ex;
             continue;
         }
         client_context* context = static_cast<client_context*>(void_context);
-        if (overlapped_ex->operation_code == OP_KEEP_ALIVE)
+        if (overlapped_ex->op_code == operation_code::KEEP_ALIVE)
         {
             if (!context->isAlive())
             {
@@ -81,7 +96,7 @@ DWORD server::WorkerThread(LPVOID param)
             continue;
         }
 
-        if (overlapped_ex->operation_code == OP_RECV && client->get_recv_message_type() == MST_DISCONNECT)
+        if (overlapped_ex->op_code == operation_code::RECV && client->get_recv_message_type() == MST_DISCONNECT)
         {
             std::cout << client->id << " send disconnect" << std::endl;
             me->drop_client(context);
@@ -104,8 +119,8 @@ DWORD server::WorkerThread(LPVOID param)
 
             break;
         case STATE_INIT:
-            //In this state, client may ask to queue him (OP_RECV) or to get pair (OP_SEND)
-            if (overlapped_ex->operation_code == OP_RECV)
+            //In this state, client may ask to queue him (operation_code::RECV) or to get pair (operation_code::SEND)
+            if (overlapped_ex->op_code == operation_code::RECV)
             {
                 if (client->get_recv_message_type() != MST_QUEUE || client->q_msg.size() > 0) //Seconds cond means it is already in queue
                 {
@@ -131,7 +146,7 @@ DWORD server::WorkerThread(LPVOID param)
         case STATE_MESSAGING:
             //Client just sending and receiving
 
-            if (overlapped_ex->operation_code == OP_RECV)
+            if (overlapped_ex->op_code == operation_code::RECV)
             {
                 //We have received smth, let's send it to another client
                 std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
@@ -163,7 +178,7 @@ DWORD server::WorkerThread(LPVOID param)
         case STATE_VOTING:
             //In this state, clients are only allowed to send or receive one message with results
 
-            if (overlapped_ex->operation_code == OP_RECV)
+            if (overlapped_ex->op_code == operation_code::RECV)
             {
                 if (client->get_recv_message_type() != MST_VOTING)
                 {
@@ -329,18 +344,6 @@ void server::handle_queue_request(std::shared_ptr<Client> const& client, DWORD d
     }
 }
 
-int server::get_proc_count()
-{
-    if (g_processors_count == -1)
-    {
-        //Getting system info
-        SYSTEM_INFO si;
-        GetSystemInfo(&si);
-        g_processors_count = si.dwNumberOfProcessors;
-    }
-    return g_processors_count;
-}
-
 bool server::init()
 {
     //Initializing WSA
@@ -398,7 +401,7 @@ void server::shutdown()
 
 server::server(server_launch_params params)
 {
-    overlapped_ac = new OVERLAPPED_EX{OP_ACCEPT};
+    overlapped_ac = new OVERLAPPED_EX{operation_code::ACCEPT};
     accept_buf = static_cast<char*>(malloc(sizeof(char)*(2 * sizeof(sockaddr_in) + 32)));
     if (!init()) throw std::runtime_error("Error in initializing");
     listenSock = create_listen_socket(params);
