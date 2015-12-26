@@ -95,11 +95,9 @@ SOCKET Client::get_socket()
 Client::Client(SOCKET s) : socket(s)
 {
     client_status = STATE_NEW;
-    overlapped_recv = new OVERLAPPED_EX{};
-    overlapped_recv->operation_code = OP_RECV;
-    overlapped_send = new OVERLAPPED_EX{};
-    overlapped_send->operation_code = OP_SEND;
-
+    overlapped_recv = new OVERLAPPED_EX{OP_RECV};
+    overlapped_send = new OVERLAPPED_EX{OP_SEND};
+    overlapped_special = new OVERLAPPED_EX{OP_KEEP_ALIVE};
 }
 
 Client::~Client()
@@ -112,4 +110,5 @@ Client::~Client()
 
     if (HasOverlappedIoCompleted(overlapped_send)) delete overlapped_send;
 
+    overlapped_special->operation_code = OP_DELETED;
 }

@@ -5,19 +5,21 @@
 #include "client_buffer.h"
 
 //Operation codes for clients
-#define OP_SEND 1
 //Server sends data to client
-#define OP_RECV 2
+#define OP_SEND 1
 //Server recievs data
+#define OP_RECV 2
+//Special codes
+#define OP_KEEP_ALIVE 10
+#define OP_ACCEPT 11
+#define OP_DELETED 12
 
 //Client statuses
-#define DUMMY -1
 #define STATE_NEW 0
 #define STATE_INIT 1
 #define STATE_QUEUED 2
 #define STATE_MESSAGING 4
 #define STATE_VOTING 8
-#define STATE_FINISHED 16
 
 //Message types
 #define MST_QUEUE 1
@@ -27,9 +29,18 @@
 #define MST_DISCONNECT 10
 #define MST_LEAVE 69
 
+//Maximum inactivity time in SECONDS
+#ifdef _DEBUG
+#define MAX_IDLENESS_TIME 15
+#else
+#define MAX_IDLENESS_TIME (10*60)
+#endif
+
 struct OVERLAPPED_EX : OVERLAPPED
 {
     unsigned operation_code;
+
+    explicit OVERLAPPED_EX(unsigned code) : OVERLAPPED{}, operation_code(code){};
 };
 
 class Client
@@ -37,6 +48,8 @@ class Client
     //Field, necessary for overlapped (async) operations
     OVERLAPPED_EX *overlapped_send;
     OVERLAPPED_EX *overlapped_recv;
+    //Special field for keep-alive
+    OVERLAPPED_EX *overlapped_special;
 
     //Buffer with data
     CLIENT_BUFFER buffer;
@@ -47,6 +60,10 @@ class Client
     //Client* companion = nullptr;    
     std::weak_ptr<Client> companion;
 public:
+    inline OVERLAPPED_EX* get_overlapped()
+    {
+        return overlapped_special;
+    }
     unsigned long id;
     int client_status;
     std::string q_msg;
@@ -80,7 +97,31 @@ struct client_context
 {
     std::shared_ptr<Client> ptr; //Copies right by default?
     char dummy;
-    client_context(Client* a) :ptr(a), dummy(0) {};
+    uint64_t lastActivity;
+    client_context(Client* a) :ptr(a), dummy(0),lastActivity(current_time()) {};
     client_context() : dummy(1) {};
+
+    client_context(const client_context& other) = delete;
+
+    client_context& operator=(const client_context& other) = delete;
+
+    inline bool isAlive() const noexcept
+    {
+        return (current_time() - lastActivity) < MAX_IDLENESS_TIME;
+    }
+
+    inline void updateTimer() noexcept
+    {
+        lastActivity = current_time();
+    }
+    inline std::function<void()> get_upd_f(HANDLE comp_port) noexcept
+    {
+        //Save overlapped as member of anonymous class, because THIS can be deleted at moment of run operator()
+        LPOVERLAPPED over_ptr = (LPOVERLAPPED)this->ptr->get_overlapped();
+        return [=] ()
+        {
+            PostQueuedCompletionStatus(comp_port, 1, (ULONG_PTR)this, over_ptr);
+        };
+    }
 };
 

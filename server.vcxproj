@@ -146,6 +146,7 @@
     <ClCompile Include="client.cpp" />
     <ClCompile Include="client_queue.cpp" />
     <ClCompile Include="client_storage.cpp" />
+    <ClCompile Include="function_queue.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="server.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -158,6 +159,7 @@
     <ClInclude Include="client_buffer.h" />
     <ClInclude Include="client_queue.h" />
     <ClInclude Include="client_storage.h" />
+    <ClInclude Include="function_queue.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>

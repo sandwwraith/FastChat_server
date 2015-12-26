@@ -12,7 +12,7 @@ public:
     void attach_client(client_context*);
     client_storage(const client_storage& other) = delete;
     client_storage& operator=(const client_storage& other) = delete;
-    void detach_client(client_context*);
+    void detach_client(client_context*) noexcept;
     void clear_all();
 
     std::list<client_context*> const& watch_clients() const;

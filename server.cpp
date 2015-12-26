@@ -34,7 +34,32 @@ DWORD server::WorkerThread(LPVOID param)
             return 0;
         }
 
+        overlapped_ex = static_cast<OVERLAPPED_EX*>(overlapped);
+        //Checking keep-alive
+        if (overlapped_ex->operation_code == OP_DELETED)
+        {
+            std::cout << "overlapped deleted\n";
+            delete overlapped_ex;
+            continue;
+        }
         client_context* context = static_cast<client_context*>(void_context);
+        if (overlapped_ex->operation_code == OP_KEEP_ALIVE)
+        {
+            if (!context->isAlive())
+            {
+                std::cout << context->ptr->id << " idleness time exceeded" <<std::endl;
+                delete overlapped_ex;
+                me->drop_client(context);
+            }
+            else
+            {
+                //std::cout << "Adding delay...\n";
+                //post another kill delay...
+                me->g_func_queue.enqueue(context->get_upd_f(me->g_io_completion_port), MAX_IDLENESS_TIME);
+            }
+            continue;
+        }
+        //Checking if event is accept
         if (context->dummy)
         {
             if (me->lastAccepted != nullptr) {
@@ -46,6 +71,8 @@ DWORD server::WorkerThread(LPVOID param)
             }
             continue;
         }
+
+        context->updateTimer();
         auto client = context->ptr;
         if (dwBytesTransfered == 0) //Client dropped connection
         {
@@ -53,7 +80,6 @@ DWORD server::WorkerThread(LPVOID param)
             me->drop_client(context);
             continue;
         }
-        overlapped_ex = static_cast<OVERLAPPED_EX*>(overlapped);
 
         if (overlapped_ex->operation_code == OP_RECV && client->get_recv_message_type() == MST_DISCONNECT)
         {
@@ -187,9 +213,10 @@ void server::finish_accept() noexcept
         }
         if (!accepted->send_greetings(this->g_client_storage.clients_count()))
         {
-            std::cout << "Error in inital send, drop client " << accepted->id << std::endl;
+            std::cout << "Error in inital send,"<<WSAGetLastError() << " drop client " << accepted->id << std::endl;
             this->drop_client(this->lastAccepted);
         }
+        g_func_queue.enqueue(lastAccepted->get_upd_f(g_io_completion_port), MAX_IDLENESS_TIME);
         this->lastAccepted = nullptr;
         if (!this->accept()) throw std::exception("Can't start accept, WSA code" + WSAGetLastError());
     }
@@ -281,15 +308,8 @@ unsigned server::clients_count() const noexcept
 void server::drop_client(client_context* cl) noexcept
 {
     if (cl == nullptr) return;
-    try 
-    {
-        g_client_storage.detach_client(cl);
-    }
-    catch (std::exception const& ex)
-    {
-        std::cout << "Fatal DROP Error: " << ex.what() << std::endl;
-        delete cl;
-    }
+
+    g_client_storage.detach_client(cl);
     return;
 }
 
@@ -378,7 +398,7 @@ void server::shutdown()
 
 server::server(server_launch_params params)
 {
-    overlapped_ac = new OVERLAPPED{};
+    overlapped_ac = new OVERLAPPED_EX{OP_ACCEPT};
     accept_buf = static_cast<char*>(malloc(sizeof(char)*(2 * sizeof(sockaddr_in) + 32)));
     if (!init()) throw std::runtime_error("Error in initializing");
     listenSock = create_listen_socket(params);

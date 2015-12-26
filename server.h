@@ -9,6 +9,7 @@
 
 #include "client_queue.h"
 #include "client_storage.h"
+#include "function_queue.h"
 
 #pragma comment(lib,"Ws2_32.lib")
 
@@ -59,6 +60,7 @@ class server
     //Global storage for all clients
     client_queue g_client_queue;
     client_storage g_client_storage;
+    function_queue g_func_queue;
 
     static DWORD WINAPI WorkerThread(LPVOID); //Worker function for threads
     bool init();
@@ -67,7 +69,7 @@ class server
     SOCKET create_listen_socket(server_launch_params);
     SOCKET listenSock;
 
-    OVERLAPPED* overlapped_ac;
+    OVERLAPPED_EX* overlapped_ac;
     char* accept_buf;
     client_context* lastAccepted = nullptr;
     client_context* acceptContext = nullptr;

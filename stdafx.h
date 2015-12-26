@@ -13,4 +13,9 @@
 #include <mutex>
 #include <memory>
 
+inline uint64_t current_time() noexcept 
+{
+    return std::chrono::system_clock::now().time_since_epoch().count() 
+        * std::chrono::system_clock::period::num / std::chrono::system_clock::period::den;
+}
 #endif

@@ -9,7 +9,7 @@ void client_storage::attach_client(client_context* cl)
 
 }
 
-void client_storage::detach_client(client_context* cl)
+void client_storage::detach_client(client_context* cl) noexcept
 {
     std::lock_guard<std::mutex> guard{ cs_clientList };
     for (auto it = storage.begin(), end = storage.end(); it != end; ++it)

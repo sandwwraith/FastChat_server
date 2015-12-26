@@ -58,8 +58,9 @@ std::shared_ptr<Client> client_queue::pair_or_queue(std::shared_ptr<Client> cons
 
 client_queue::client_queue()
 {
-    uint64_t seed = std::chrono::system_clock::now().time_since_epoch().count();
-    generator = std::default_random_engine(static_cast<unsigned int>(seed));
+#ifndef _DEBUG
+    generator = std::default_random_engine(static_cast<unsigned int>(current_time()));
+#endif
 }
 
 
