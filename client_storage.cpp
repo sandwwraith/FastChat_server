@@ -35,13 +35,9 @@ void client_storage::clear_all()
 
 }
 
-std::list<client_context*> const& client_storage::watch_clients() const
-{
-    return storage;
-}
-
 unsigned int client_storage::clients_count() const noexcept
 {
+    std::lock_guard<std::mutex> guard{ cs_clientList };
     return static_cast<unsigned>(storage.size());
 }
 

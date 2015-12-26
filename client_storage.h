@@ -15,7 +15,6 @@ public:
     void detach_client(client_context*) noexcept;
     void clear_all();
 
-    std::list<client_context*> const& watch_clients() const;
     unsigned int clients_count() const noexcept;
     client_storage();
     ~client_storage();
