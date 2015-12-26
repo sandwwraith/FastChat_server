@@ -82,7 +82,7 @@ class server
 public:
 
     int get_proc_count();
-    unsigned int clients_count() const;
+    unsigned int clients_count() const noexcept;
     explicit server(server_launch_params);
     server(const server& other) = delete;
     server& operator=(const server& other) = delete;

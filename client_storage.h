@@ -7,7 +7,6 @@ class client_storage
     std::list<client_context*> storage;
 
     //Mutex for working with storage
-    //CRITICAL_SECTION cs_clientList;
     std::mutex cs_clientList;
 public:
     void attach_client(client_context*);
@@ -17,7 +16,7 @@ public:
     void clear_all();
 
     std::list<client_context*> const& watch_clients() const;
-    unsigned int clients_count() const;
+    unsigned int clients_count() const noexcept;
     client_storage();
     ~client_storage();
 };

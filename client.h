@@ -39,13 +39,10 @@ class Client
     OVERLAPPED_EX *overlapped_recv;
 
     //Buffer with data
-    //WSABUF *wsabuf;
     CLIENT_BUFFER buffer;
 
     //Socket of client
     SOCKET socket;
-
-    CRITICAL_SECTION cl_sec;
 
     //Client* companion = nullptr;    
     std::weak_ptr<Client> companion;
@@ -54,11 +51,6 @@ public:
     int client_status;
     std::string q_msg;
 
-    /*Client* get_companion() const;
-    void set_companion(Client*);
-    void delete_companion();
-    bool has_companion();
-    bool own_companion();*/
     std::weak_ptr<Client> &get_companion();
     void set_companion(std::weak_ptr<Client>const&);
     bool has_companion() const;
@@ -78,9 +70,6 @@ public:
     int get_recv_message_type() const;
     int get_snd_message_type() const;
 
-    void lock();
-    void unlock();
-
     explicit Client(SOCKET s);
     Client(const Client& other) = delete;
     Client& operator=(const Client& other) = delete;
@@ -89,7 +78,7 @@ public:
 
 struct client_context
 {
-    std::shared_ptr<Client> ptr;
+    std::shared_ptr<Client> ptr; //Copies right by default?
     char dummy;
     client_context(Client* a) :ptr(a), dummy(0) {};
     client_context() : dummy(1) {};

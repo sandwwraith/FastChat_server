@@ -40,7 +40,7 @@ std::list<client_context*> const& client_storage::watch_clients() const
     return storage;
 }
 
-unsigned int client_storage::clients_count() const
+unsigned int client_storage::clients_count() const noexcept
 {
     return static_cast<unsigned>(storage.size());
 }

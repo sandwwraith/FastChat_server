@@ -8,19 +8,16 @@ class client_queue
     std::default_random_engine generator;
     std::uniform_int_distribution<int> distribution{ 1, 49 };
 
-    //CRITICAL_SECTION sec;
     std::mutex sec;
     std::list<std::weak_ptr<Client>> q;
 public:
     void push(std::shared_ptr<Client>const&);
-    //void remove(Client* cl);
     size_t size() const noexcept;
-    //Client* pop();
     std::shared_ptr<Client>pop();
 
     //Makes pair and sets the theme for conversation
-    //void make_pair(Client * cl);
     std::shared_ptr<Client> try_pair(std::shared_ptr<Client> const&);
+
     std::shared_ptr<Client> pair_or_queue(std::shared_ptr < Client>const&);
 
     client_queue(const client_queue& other) = delete;

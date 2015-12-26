@@ -1,39 +1,6 @@
 #include "stdafx.h"
 #include "client.h"
 
-//Client* Client::get_companion() const
-//{
-//    return companion;
-//}
-//
-//void Client::delete_companion()
-//{
-//    this->lock();
-//    companion = (nullptr);
-//    this->unlock();
-//}
-//
-//bool Client::own_companion()
-//{
-//    this->lock();
-//    if (this->has_companion())
-//    {
-//        return true;
-//    }
-//    this->unlock();
-//    return false;
-//}
-//
-//bool Client::has_companion()
-//{
-//    return companion!=nullptr;
-//}
-//
-//void Client::set_companion(Client* cmp)
-//{
-//    companion = cmp;
-//}
-
 std::weak_ptr<Client>& Client::get_companion()
 {
     return companion;
@@ -101,13 +68,6 @@ bool Client::send(std::string const & message) noexcept
 
 bool Client::safe_comp_send(std::string const& msg) noexcept
 {
-    /*if (this->own_companion())
-    {
-        get_companion()->send(msg);
-        this->unlock();
-        return true;
-    }
-    return false;*/
     auto comp = companion.lock();
     if (comp.operator bool())
     {
@@ -115,16 +75,6 @@ bool Client::safe_comp_send(std::string const& msg) noexcept
         return true;
     }
     return false;
-}
-
-void Client::lock()
-{
-    EnterCriticalSection(&cl_sec);
-}
-
-void Client::unlock()
-{
-    LeaveCriticalSection(&cl_sec);
 }
 
 int Client::get_snd_message_type() const
@@ -150,7 +100,6 @@ Client::Client(SOCKET s) : socket(s)
     overlapped_send = new OVERLAPPED_EX{};
     overlapped_send->operation_code = OP_SEND;
 
-    InitializeCriticalSection(&cl_sec);
 }
 
 Client::~Client()
@@ -163,5 +112,4 @@ Client::~Client()
 
     if (HasOverlappedIoCompleted(overlapped_send)) delete overlapped_send;
 
-    DeleteCriticalSection(&cl_sec);
 }

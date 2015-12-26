@@ -13,10 +13,11 @@ DWORD server::WorkerThread(LPVOID param)
     while (true)
     {
         BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered, (PULONG_PTR)&void_context, &overlapped, INFINITE);
+
         if (!queued_result)
         {
             auto err_code = GetLastError();
-            std::cout << "Error dequeing: " << err_code << std::endl; //121 = ERROR_SEM_TIMEOUT; 64 - NET_NAME_INVALID, need to delete client
+            std::cout << "Error dequeing: " << err_code << std::endl; //121 = ERROR_SEM_TIMEOUT; 64 = NET_NAME_INVALID, need to delete client
             if (err_code == ERROR_SEM_TIMEOUT || err_code == ERROR_NETNAME_DELETED)
             {
                 me->drop_client(static_cast<client_context*>(void_context));
@@ -32,6 +33,7 @@ DWORD server::WorkerThread(LPVOID param)
         {
             return 0;
         }
+
         client_context* context = static_cast<client_context*>(void_context);
         if (context->dummy)
         {
@@ -79,13 +81,7 @@ DWORD server::WorkerThread(LPVOID param)
             //In this state, client may ask to queue him (OP_RECV) or to get pair (OP_SEND)
             if (overlapped_ex->operation_code == OP_RECV)
             {
-                /*if (client->get_recv_message_type() == MST_DISCONNECT)
-                {
-                    std::cout << client->id << " send disconnect" << std::endl;
-                    me->drop_client(context);
-                    break;
-                }*/
-                if (client->get_recv_message_type() != MST_QUEUE || client->q_msg.size() > 0)
+                if (client->get_recv_message_type() != MST_QUEUE || client->q_msg.size() > 0) //Seconds cond means it is already in queue
                 {
                     client->recieve(); // If you ignore it, maybe it will go away
                     break;
@@ -93,22 +89,6 @@ DWORD server::WorkerThread(LPVOID param)
 
                 //Making a pair for our client
                 me->handle_queue_request(client, dwBytesTransfered);
-                //if (me->g_client_queue.size() >= 1)
-                //{
-                //    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
-                //    std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
-                //    me->g_client_queue.make_pair(client);
-                //    //Send them info
-                //    client->send(client->get_companion()->q_msg);
-                //    client->get_companion()->send(client->q_msg); //TODO: rework this also to own_companion
-                //}
-                //else
-                //{
-                //    //Enqueue user
-                //    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
-                //    std::cout << client->id << "Q_MSG:"<<client->q_msg<<std::endl;
-                //    me->g_client_queue.push(client);
-                //}
                 client->recieve(); //Client may wish to disconnect
             }
             else
@@ -136,18 +116,7 @@ DWORD server::WorkerThread(LPVOID param)
                     client->client_status = STATE_VOTING;
                 if (client->get_recv_message_type() == MST_LEAVE)
                     client->client_status = STATE_INIT;
-                /*if (client->get_recv_message_type() == MST_DISCONNECT)
-                {
-                    std::cout << client->id << " send disconnect" << std::endl;
-                    me->drop_client(context);
-                    break;
-                }*/
-                /*if (client->own_companion())
-                {
-                    if (client->get_companion()->client_status == STATE_MESSAGING)
-                        client->get_companion()->send(msg);
-                    client->unlock();
-                }*/
+
                 if (!client->safe_comp_send(msg))
                 {
                     //Handling UNEXPECTEDLY leave
@@ -177,21 +146,7 @@ DWORD server::WorkerThread(LPVOID param)
                 }
                 std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
                 std::cout << client->id << " voted " << msg << std::endl;
-                /*if (client->own_companion())
-                {
-                    client->get_companion()->send(msg);
-                    client->unlock();
-                }
-                else*/
-                /*if (!client->safe_comp_send(msg))
-                {
-                    client->client_status = STATE_INIT;
-                    client->send_bad_vote();
-                    break;
-                }
 
-                client->client_status = STATE_INIT;
-                client->recieve();*/
                 client->client_status = STATE_INIT;
                 if (!client->safe_comp_send(msg)) client->send_bad_vote();
                 client->set_companion(std::weak_ptr<Client>());
@@ -199,37 +154,10 @@ DWORD server::WorkerThread(LPVOID param)
             }
             else
             {
-                //If this client received, and last send message was vote message
-                /*if (client->get_snd_message_type() == MST_VOTING)
-                client->client_status = STATE_FINISHED;*/
+                //Actually, nothing to do.
             }
 
             break;
-        //case STATE_FINISHED:
-        //    //In this state, client who send first, received pair message and resets
-        //    //Client who send second delivers his message to first and also resets
-
-        //    if (overlapped_ex->operation_code == OP_RECV)
-        //    {
-        //        std::string msg(client->get_recv_buffer_data(), dwBytesTransfered);
-        //        std::cout << client->id << " voted " << msg << std::endl;
-        //        if (client->own_companion())
-        //        {
-        //            client->get_companion()->send(msg);
-        //            client->unlock();
-        //        }
-        //        else
-        //        {
-        //            //.... nothing to do, actually.
-        //        }
-        //    }
-
-        //    //Client may want to find another pair
-        //    client->set_companion(nullptr);
-        //    client->client_status = STATE_INIT;
-        //    client->recieve();
-
-        //    break;
         }
     }
 }
@@ -238,7 +166,7 @@ void server::finish_accept() noexcept
 {
     try {
         auto accepted = this->lastAccepted->ptr;
-        if (!accepted) throw std::runtime_error("Fatal error: contex doesn't contain a client");
+        if (!accepted) throw std::runtime_error("Context doesn't contain a client");
         std::cout << "Accept finishing, id:" << accepted->id << std::endl;
 
         int res = setsockopt(accepted->get_socket(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
@@ -252,7 +180,7 @@ void server::finish_accept() noexcept
         {
             this->g_client_storage.attach_client(this->lastAccepted);
         } 
-        catch (std::exception&)
+        catch (std::exception const&)
         {
             delete this->lastAccepted;
             throw;
@@ -265,9 +193,9 @@ void server::finish_accept() noexcept
         this->lastAccepted = nullptr;
         if (!this->accept()) throw std::exception("Can't start accept, WSA code" + WSAGetLastError());
     }
-    catch (const std::exception& ex)
+    catch (std::exception const& ex)
     {
-        std::cout << "Fatal accept error: " << ex.what() << std::endl;
+        std::cout << "Fatal ACCEPT error: " << ex.what() << std::endl;
         //WAT TO DO ???
     }
 }
@@ -345,7 +273,7 @@ SOCKET server::create_listen_socket(server_launch_params params)
     return sock;
 }
 
-unsigned server::clients_count() const
+unsigned server::clients_count() const noexcept
 {
     return g_client_storage.clients_count();
 }
@@ -355,8 +283,6 @@ void server::drop_client(client_context* cl) noexcept
     if (cl == nullptr) return;
     try 
     {
-        /*if (cl->q_msg.size() > 0) g_client_queue.remove(cl);
-        if (cl->has_companion()) cl->get_companion()->delete_companion();*/
         g_client_storage.detach_client(cl);
     }
     catch (std::exception const& ex)
@@ -467,8 +393,6 @@ server::server(server_launch_params params)
     CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)acceptContext, 0);
     if (!this->accept())
     {
-        delete acceptContext;
-        shutdown();
         throw std::exception("Cannot accept");
     }
 
