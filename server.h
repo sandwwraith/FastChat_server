@@ -83,7 +83,6 @@ class server
     void handle_queue_request(std::shared_ptr<Client>const&, DWORD);
 public:
 
-    int get_proc_count();
     unsigned int clients_count() const noexcept;
     explicit server(server_launch_params);
     server(const server& other) = delete;

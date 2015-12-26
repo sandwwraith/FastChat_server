@@ -1,6 +1,21 @@
 #include "stdafx.h"
 #include "server.h"
 
+namespace
+{
+    int calc_proc_count()
+    {
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        return si.dwNumberOfProcessors;
+    }
+
+    int get_proc_count()
+    {
+        static int const value = calc_proc_count();
+        return value;
+    }
+}
 
 DWORD server::WorkerThread(LPVOID param)
 {
@@ -327,18 +342,6 @@ void server::handle_queue_request(std::shared_ptr<Client> const& client, DWORD d
         client->send(msg2);
         pair->send(msg1);
     }
-}
-
-int server::get_proc_count()
-{
-    if (g_processors_count == -1)
-    {
-        //Getting system info
-        SYSTEM_INFO si;
-        GetSystemInfo(&si);
-        g_processors_count = si.dwNumberOfProcessors;
-    }
-    return g_processors_count;
 }
 
 bool server::init()
