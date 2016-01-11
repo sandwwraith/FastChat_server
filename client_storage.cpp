@@ -35,9 +35,9 @@ void client_storage::clear_all()
 
 }
 
-unsigned int client_storage::clients_count() const noexcept
+unsigned int client_storage::clients_count() noexcept
 {
-    std::lock_guard<std::mutex> guard{ cs_clientList };
+    std::lock_guard<std::mutex> guard { cs_clientList };
     return static_cast<unsigned>(storage.size());
 }
 

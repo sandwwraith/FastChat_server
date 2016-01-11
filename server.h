@@ -83,7 +83,7 @@ class server
     void handle_queue_request(std::shared_ptr<Client>const&, DWORD);
 public:
 
-    unsigned int clients_count() const noexcept;
+    unsigned int clients_count() noexcept;
     explicit server(server_launch_params);
     server(const server& other) = delete;
     server& operator=(const server& other) = delete;

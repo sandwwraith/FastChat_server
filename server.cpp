@@ -315,7 +315,7 @@ SOCKET server::create_listen_socket(server_launch_params params)
     return sock;
 }
 
-unsigned server::clients_count() const noexcept
+unsigned server::clients_count() noexcept
 {
     return g_client_storage.clients_count();
 }

@@ -17,16 +17,16 @@ _fq_event function_queue::safe_pop()
 
 void function_queue::worker(function_queue* me)
 {
-    while (!cancelled)
+    while (!me->cancelled)
     {
         std::unique_lock<std::mutex> lck{ me->mut };
         while (me->event_q.empty()) {
             me->cv.wait(lck);
-            if (cancelled) return;
+            if (me->cancelled) return;
         }
 
         auto t = me->event_q.top().at;
-        me->cv.wait_until(lck, t); // TODO: wakeup because of push
+        while (std::chrono::system_clock::now() < t) me->cv.wait_until(lck, t);
         auto e = me->safe_pop();
         e.runnable();
     }

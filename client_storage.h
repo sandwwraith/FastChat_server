@@ -15,7 +15,7 @@ public:
     void detach_client(client_context*) noexcept;
     void clear_all();
 
-    unsigned int clients_count() const noexcept;
+    unsigned int clients_count() noexcept;
     client_storage();
     ~client_storage();
 };
