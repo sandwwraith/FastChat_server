@@ -24,6 +24,59 @@ DWORD server::WorkerThread(LPVOID param)
     OVERLAPPED* overlapped = nullptr;
     OVERLAPPED_EX* overlapped_ex;
     DWORD dwBytesTransfered = 0;
+    while (true)
+    {
+        BOOL queued_result = GetQueuedCompletionStatus(me->g_io_completion_port, &dwBytesTransfered,
+            (PULONG_PTR)&void_context, &overlapped, INFINITE);
+
+        if (!queued_result)
+        {
+            auto err_code = GetLastError();
+            std::cout << "Error dequeing: " << err_code << std::endl; //121 = ERROR_SEM_TIMEOUT; 64 = NET_NAME_INVALID, need to delete client
+            if (err_code == ERROR_SEM_TIMEOUT || err_code == ERROR_NETNAME_DELETED)
+            {
+                me->drop_client(static_cast<client_context*>(void_context));
+            }
+            if (err_code == ERROR_CONNECTION_ABORTED) //Deleted socket
+            {
+                delete overlapped;
+            }
+            continue;
+        }
+
+        if (void_context == nullptr) //Signal to shutdown
+        {
+            return 0;
+        }
+
+        overlapped_ex = static_cast<OVERLAPPED_EX*>(overlapped);
+        if (overlapped_ex->op_code == operation_code::DELETED)
+        {
+            delete overlapped_ex;
+            continue;
+        }
+        if (overlapped_ex->op_code == operation_code::ACCEPT)
+        {
+            me->finish_accept();
+            continue;
+        }
+        client_context* context = static_cast<client_context*>(void_context);
+        if (dwBytesTransfered == 0) //Client dropped connection
+        {
+            std::cout << context->ptr->id << " Zero bytes transfered, disconnecting" << std::endl;
+            me->drop_client(context);
+            continue;
+        }
+        context->on_overlapped_io_finished(dwBytesTransfered, overlapped_ex);
+    }
+}
+/*DWORD server::WorkerThread(LPVOID param)
+{
+    server* me = static_cast<server*>(param);
+    void* void_context = nullptr;
+    OVERLAPPED* overlapped = nullptr;
+    OVERLAPPED_EX* overlapped_ex;
+    DWORD dwBytesTransfered = 0;
 
     while (true)
     {
@@ -201,7 +254,7 @@ DWORD server::WorkerThread(LPVOID param)
             break;
         }
     }
-}
+}*/
 
 void server::finish_accept() noexcept
 {
@@ -231,7 +284,7 @@ void server::finish_accept() noexcept
             std::cout << "Error in inital send,"<<WSAGetLastError() << " drop client " << accepted->id << std::endl;
             this->drop_client(this->lastAccepted);
         }
-        g_func_queue.enqueue(lastAccepted->get_upd_f(g_io_completion_port), MAX_IDLENESS_TIME);
+        //g_func_queue.enqueue(lastAccepted->get_upd_f(g_io_completion_port), MAX_IDLENESS_TIME);
         this->lastAccepted = nullptr;
         if (!this->accept()) throw std::exception("Can't start accept, WSA code" + WSAGetLastError());
     }
@@ -277,13 +330,13 @@ bool server::accept()
 
     Client* cl = new Client(acc_socket);
     cl->id = ids++;
-    this->lastAccepted = new client_context(cl);
+    this->lastAccepted = new client_context(this,cl);
     HANDLE port = CreateIoCompletionPort((HANDLE)acc_socket, this->g_io_completion_port, (ULONG_PTR)this->lastAccepted, 0);
     if (port == nullptr)
     {
         std::cout << "Can't bind new client to comp port: " << GetLastError() << std::endl;
+        delete lastAccepted;
         this->lastAccepted = nullptr;
-        delete cl;
         return false;
     }
     return true;
@@ -330,18 +383,18 @@ void server::drop_client(client_context* cl) noexcept
 
 void server::handle_queue_request(std::shared_ptr<Client> const& client, DWORD dwBytesTransfered)
 {
-    client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
-    std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
+    //client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
+    //std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
 
-    auto pair = g_client_queue.pair_or_queue(client);
-    if (pair)
-    {
-        //Pair found
-        std::string msg1{ std::move(client->q_msg) };
-        std::string msg2{ std::move(pair->q_msg) }; //Caching strings
-        client->send(msg2);
-        pair->send(msg1);
-    }
+    //auto pair = g_client_queue.pair_or_queue(client);
+    //if (pair)
+    //{
+    //    //Pair found
+    //    std::string msg1{ std::move(client->q_msg) };
+    //    std::string msg2{ std::move(pair->q_msg) }; //Caching strings
+    //    client->send(msg2);
+    //    pair->send(msg1);
+    //}
 }
 
 bool server::init()
@@ -412,7 +465,7 @@ server::server(server_launch_params params)
         throw std::runtime_error("Cannot create listen socket");
     }
 
-    acceptContext = new client_context();
+    acceptContext = new client_context(this, nullptr);
     CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)acceptContext, 0);
     if (!this->accept())
     {

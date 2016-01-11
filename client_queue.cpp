@@ -37,12 +37,12 @@ std::shared_ptr<Client> client_queue::try_pair(std::shared_ptr<Client> const& cl
     auto pair = this->pop();
     if (pair)
     {
-        client->set_companion(std::weak_ptr<Client>(pair));
+        /*client->set_companion(std::weak_ptr<Client>(pair));
         pair->set_companion(std::weak_ptr<Client>(client));
 
         char theme = distribution(generator);
         client->q_msg[2] = theme;
-        pair->q_msg[2] = theme;
+        pair->q_msg[2] = theme;*/
         return pair;
     }
     return std::shared_ptr<Client>();

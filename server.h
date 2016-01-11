@@ -7,7 +7,7 @@
 #include <iostream>
 #include <conio.h>
 
-#include "client_queue.h"
+//#include "client_queue.h"
 #include "client_storage.h"
 #include "function_queue.h"
 
@@ -58,7 +58,7 @@ class server
     HANDLE g_io_completion_port;
 
     //Global storage for all clients
-    client_queue g_client_queue;
+    //client_queue g_client_queue;
     client_storage g_client_storage;
     function_queue g_func_queue;
 
@@ -79,7 +79,7 @@ class server
     unsigned long ids = 0;
 
     void drop_client(client_context*) noexcept;
-
+    friend class client_context;
     void handle_queue_request(std::shared_ptr<Client>const&, DWORD);
 public:
 
