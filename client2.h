@@ -28,10 +28,10 @@ class socket_user
 {
 private:
     SOCKET sock;
-    CLIENT_BUFFER buf;
     OVERLAPPED_EX* snd;
     OVERLAPPED_EX* rcv;
 public:
+    CLIENT_BUFFER buf;
     void send(std::string const&);
     void recv();
     std::string read(unsigned bytes_count);
@@ -52,14 +52,30 @@ enum client_res
 
 enum client_statuses
 {
-    NEW, INIT, QUEUED, MESSAGING, VOTING
+    NEW, INIT, MESSAGING, VOTING
 };
+
+//Message types
+#define MST_QUEUE 1
+#define MST_MESSAGE 2
+#define MST_TIMEOUT 3
+#define MST_VOTING 4
+#define MST_DISCONNECT 10
+#define MST_LEAVE 69
+
 class Client
 {
     socket_user handle;
     std::string q_msg;
     std::weak_ptr<Client> companion;
     client_statuses status;
+
+    int get_recv_message_type() const;
+    int get_snd_message_type() const;
+
+    bool safe_comp_send(std::string const&);
+    bool send_leaved();
+    bool send_bad_vote();
 
 public:
     unsigned id;
@@ -71,6 +87,7 @@ public:
 
     void on_pair_found(std::shared_ptr<Client>const& pair);
     void set_theme(char);
+    
     //~Client() {};
 };
 

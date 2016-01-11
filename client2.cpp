@@ -72,15 +72,74 @@ client_res Client::on_recv_finished(unsigned bytesTransfered)
 {
     std::string msg{ handle.read(bytesTransfered) };
     std::cout << "Client " << id << " send " << msg << std::endl;
-    if (msg[0] == 3) //disconnect 
-        return DISCONNECT;
-    handle.send(msg);
-    handle.recv();
+    switch(status)
+    {
+    case INIT:
+        if (get_recv_message_type() != MST_QUEUE || q_msg.size() > 0)
+        {
+            handle.recv();
+            break;
+        }
+        this->q_msg = msg;
+        handle.recv();
+        return QUEUE_OP;
+    case MESSAGING:
+        
+        if (this->get_recv_message_type() == MST_TIMEOUT)
+            status = VOTING;
+        if (this->get_recv_message_type() == MST_LEAVE)
+            status = INIT;
+        if (!this->safe_comp_send(msg))
+        {
+            //Handling UNEXPECTEDLY leave
+            this->send_leaved();
+        }
+
+        handle.recv();
+        break;
+    case VOTING:
+        if (get_recv_message_type()!= MST_VOTING)
+        {
+            handle.recv();
+            break;
+        }
+        status = INIT;
+        if (!this->safe_comp_send(msg)) this->send_bad_vote();
+        this->companion = std::weak_ptr<Client>();
+        handle.recv();
+    default:
+        break;
+    }
     return OK;
 }
 
 client_res Client::on_send_finished(unsigned bytesTransfered)
 {
+    switch(status)
+    {
+    case NEW:
+        status = INIT;
+        handle.recv();
+        break;
+    case INIT:
+        if (get_snd_message_type() == MST_QUEUE)
+        {
+            auto p = companion.lock();
+            if (p)
+            {
+                p->q_msg.resize(0);
+                status = MESSAGING;
+            }
+        }
+        break;
+    case MESSAGING:
+        if (this->get_snd_message_type() == MST_TIMEOUT)
+            status = VOTING;
+        if (this->get_snd_message_type() == MST_LEAVE)
+            status = INIT;
+    default:
+        break;
+    }
     return OK;
 }
 
@@ -90,14 +149,56 @@ void Client::on_pair_found(std::shared_ptr<Client>const& pair)
     handle.send(pair->q_msg);
 }
 
+bool Client::safe_comp_send(std::string const& msg)
+{
+    auto comp = companion.lock();
+    if (comp)
+    {
+        comp->handle.send(msg);
+        return true;
+    }
+    return false;
+}
+
+bool Client::send_bad_vote()
+{
+    std::string s = { 42, MST_VOTING, 0 };
+    handle.send(s);
+    return true;
+}
+
+bool Client::send_leaved()
+{
+    std::string s = { 42, MST_LEAVE };
+    handle.send(s);
+    return true;
+}
+
+int Client::get_snd_message_type() const
+{
+    return this->handle.buf.send_buf.buf[1];
+}
+
+int Client::get_recv_message_type() const
+{
+    return this->handle.buf.recv_buf.buf[1];
+}
+
 void Client::set_theme(char theme)
 {
     this->q_msg[2] = theme;
 }
 
-bool Client::send_greetings(unsigned)
+bool Client::send_greetings(unsigned users_online)
 {
-    handle.send("Greetings, traveller!\n");
-    handle.recv();
+    static_assert(sizeof(int) == 4, "Sizeof(int) doesn't equals 4");
+
+    std::string buf;
+    buf.push_back(42);
+    buf.push_back(users_online >> 24 & 0xFF);
+    buf.push_back(users_online >> 16 & 0xFF);
+    buf.push_back(users_online >> 8 & 0xFF);
+    buf.push_back(users_online & 0xFF);
+    handle.send(buf);
     return true;
 }
