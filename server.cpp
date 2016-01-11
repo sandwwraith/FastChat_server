@@ -386,15 +386,21 @@ void server::handle_queue_request(std::shared_ptr<Client> const& client, DWORD d
     //client->q_msg = std::string(client->get_recv_buffer_data(), dwBytesTransfered);
     //std::cout << client->id << "Q_MSG:" << client->q_msg << std::endl;
 
-    //auto pair = g_client_queue.pair_or_queue(client);
-    //if (pair)
-    //{
-    //    //Pair found
+    auto pair = g_client_queue.pair_or_queue(client);
+    if (pair)
+    {
+        //Pair found
+        char t = g_client_queue.generate_random();
+        client->set_theme(t);
+        pair->set_theme(t);
+        client->on_pair_found(pair);
+        pair->on_pair_found(client);
+
     //    std::string msg1{ std::move(client->q_msg) };
     //    std::string msg2{ std::move(pair->q_msg) }; //Caching strings
     //    client->send(msg2);
     //    pair->send(msg1);
-    //}
+    }
 }
 
 bool server::init()

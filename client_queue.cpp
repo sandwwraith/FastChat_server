@@ -50,7 +50,7 @@ std::shared_ptr<Client> client_queue::try_pair(std::shared_ptr<Client> const& cl
 
 std::shared_ptr<Client> client_queue::pair_or_queue(std::shared_ptr<Client> const& cl)
 {
-    auto p = try_pair(cl);
+    auto p = pop();
     if (!p)
         this->push(cl);
     return p;
@@ -65,3 +65,8 @@ client_queue::client_queue()
 
 
 client_queue::~client_queue() {}
+
+char client_queue::generate_random()
+{
+    return distribution(generator);
+}

@@ -81,8 +81,18 @@ client_res Client::on_recv_finished(unsigned bytesTransfered)
 
 client_res Client::on_send_finished(unsigned bytesTransfered)
 {
-    //no action
     return OK;
+}
+
+void Client::on_pair_found(std::shared_ptr<Client>const& pair)
+{
+    this->companion = std::weak_ptr<Client>{ pair };
+    handle.send(pair->q_msg);
+}
+
+void Client::set_theme(char theme)
+{
+    this->q_msg[2] = theme;
 }
 
 bool Client::send_greetings(unsigned)

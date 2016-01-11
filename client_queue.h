@@ -24,5 +24,7 @@ public:
     client_queue& operator=(const client_queue& other) = delete;
     client_queue();
     ~client_queue();
+
+    char generate_random();
 };
 

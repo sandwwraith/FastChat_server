@@ -49,9 +49,18 @@ enum client_res
 {
     OK, DISCONNECT, QUEUE_OP
 };
+
+enum client_statuses
+{
+    NEW, INIT, QUEUED, MESSAGING, VOTING
+};
 class Client
 {
     socket_user handle;
+    std::string q_msg;
+    std::weak_ptr<Client> companion;
+    client_statuses status;
+
 public:
     unsigned id;
     explicit Client(SOCKET s) : handle(s) {};
@@ -59,6 +68,9 @@ public:
     client_res on_send_finished(unsigned bytesTransfered);
     bool send_greetings(unsigned);
     SOCKET get_socket() { return handle.get_socket(); };
+
+    void on_pair_found(std::shared_ptr<Client>const& pair);
+    void set_theme(char);
     //~Client() {};
 };
 
