@@ -79,7 +79,7 @@ class Client
 
 public:
     unsigned id;
-    explicit Client(SOCKET s) : handle(s) {};
+    explicit Client(SOCKET s) : handle(s) { status = NEW; };
     client_res on_recv_finished(unsigned bytesTransfered);
     client_res on_send_finished(unsigned bytesTransfered);
     bool send_greetings(unsigned);
@@ -91,12 +91,26 @@ public:
     //~Client() {};
 };
 
+#ifdef _DEBUG
+#define MAX_IDLENESS_TIME 15
+#else
+#define MAX_IDLENESS_TIME (10*60)
+#endif
 
 class client_context
 {
     server* host;
+
+    uint64_t lastActivity;
+    OVERLAPPED_EX* over;
 public:
+    
     std::shared_ptr<Client> ptr;
     void on_overlapped_io_finished(unsigned bytesTransfered, OVERLAPPED_EX* overlapped) noexcept;
-    explicit client_context(server* serv, Client* cl) : host(serv), ptr(cl) {};
+    explicit client_context(server* serv, Client* cl);
+    ~client_context();
+
+    bool isAlive() const noexcept;
+    void updateTimer() noexcept;
+    std::function<void()> get_upd_f(HANDLE comp_port) noexcept;
 };

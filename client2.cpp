@@ -68,10 +68,44 @@ void client_context::on_overlapped_io_finished(unsigned bytesTransfered, OVERLAP
 
 }
 
+client_context::client_context(server* serv, Client* cl) : host(serv), ptr(cl) 
+{
+    over = new OVERLAPPED_EX{ operation_code::KEEP_ALIVE };
+}
+
+client_context::~client_context()
+{
+    over->op_code = operation_code::DELETED;
+}
+
+bool client_context::isAlive() const noexcept
+{
+    return (current_time() - lastActivity) < MAX_IDLENESS_TIME;
+}
+
+void client_context::updateTimer() noexcept
+{
+    lastActivity = current_time();
+}
+
+std::function<void()> client_context::get_upd_f(HANDLE comp_port) noexcept
+{
+    //Save overlapped as member of anonymous class, because THIS can be deleted at moment of run operator()
+    LPOVERLAPPED over_ptr = (LPOVERLAPPED)this->over;
+    return [=]()
+        {
+            PostQueuedCompletionStatus(comp_port, 1, (ULONG_PTR)this, over_ptr);
+        };
+}
+
 client_res Client::on_recv_finished(unsigned bytesTransfered)
 {
     std::string msg{ handle.read(bytesTransfered) };
     std::cout << "Client " << id << " send " << msg << std::endl;
+    if (get_recv_message_type() == MST_DISCONNECT)
+    {
+        return DISCONNECT;
+    }
     switch(status)
     {
     case INIT:

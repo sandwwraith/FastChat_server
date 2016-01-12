@@ -55,12 +55,31 @@ DWORD server::WorkerThread(LPVOID param)
             delete overlapped_ex;
             continue;
         }
+
+        client_context* context = static_cast<client_context*>(void_context);
+        if (overlapped_ex->op_code == operation_code::KEEP_ALIVE)
+        {
+            if (!context->isAlive())
+            {
+                std::cout << context->ptr->id << " idleness time exceeded" << std::endl;
+                delete overlapped_ex;
+                me->drop_client(context);
+            }
+            else
+            {
+                //std::cout << "Adding delay...\n";
+                //post another kill delay...
+                me->g_func_queue.enqueue(context->get_upd_f(me->g_io_completion_port), MAX_IDLENESS_TIME);
+            }
+            continue;
+        }
+
         if (overlapped_ex->op_code == operation_code::ACCEPT)
         {
             me->finish_accept();
             continue;
         }
-        client_context* context = static_cast<client_context*>(void_context);
+        
         if (dwBytesTransfered == 0) //Client dropped connection
         {
             std::cout << context->ptr->id << " Zero bytes transfered, disconnecting" << std::endl;
@@ -284,7 +303,7 @@ void server::finish_accept() noexcept
             std::cout << "Error in inital send,"<<WSAGetLastError() << " drop client " << accepted->id << std::endl;
             this->drop_client(this->lastAccepted);
         }
-        //g_func_queue.enqueue(lastAccepted->get_upd_f(g_io_completion_port), MAX_IDLENESS_TIME);
+        g_func_queue.enqueue(lastAccepted->get_upd_f(g_io_completion_port), MAX_IDLENESS_TIME);
         this->lastAccepted = nullptr;
         if (!this->accept()) throw std::exception("Can't start accept, WSA code" + WSAGetLastError());
     }
