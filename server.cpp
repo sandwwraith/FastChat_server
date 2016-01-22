@@ -86,6 +86,7 @@ DWORD server::WorkerThread(LPVOID param)
             me->drop_client(context);
             continue;
         }
+        context->updateTimer();
         context->on_overlapped_io_finished(dwBytesTransfered, overlapped_ex);
     }
 }

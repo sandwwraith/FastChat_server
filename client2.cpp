@@ -58,7 +58,11 @@ void client_context::on_overlapped_io_finished(unsigned bytesTransfered, OVERLAP
             std::cout << "Unknown opcode\n";
         }
         if (res == QUEUE_OP) host->handle_queue_request(ptr, bytesTransfered);
-        if (res == DISCONNECT) host->drop_client(this);
+        if (res == DISCONNECT)
+        {
+            std::cout << ptr->id << " send disconnect"<<std::endl;
+            host->drop_client(this);
+        }
     } 
     catch (std::exception& e)
     {

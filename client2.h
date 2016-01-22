@@ -91,11 +91,13 @@ public:
     //~Client() {};
 };
 
+constexpr static const int MAX_IDLENESS_TIME =
 #ifdef _DEBUG
-#define MAX_IDLENESS_TIME 15
+30
 #else
-#define MAX_IDLENESS_TIME (10*60)
+(10 * 60)
 #endif
+;
 
 class client_context
 {
