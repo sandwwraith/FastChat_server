@@ -106,14 +106,14 @@ client_res Client::on_recv_finished(unsigned bytesTransfered)
 {
     std::string msg{ handle.read(bytesTransfered) };
     std::cout << "Client " << id << " send " << msg << std::endl;
-    if (get_recv_message_type() == MST_DISCONNECT)
+    if (get_recv_message_type() == message_type::DISCONNECT)
     {
         return DISCONNECT;
     }
     switch(status)
     {
     case INIT:
-        if (get_recv_message_type() != MST_QUEUE || q_msg.size() > 0)
+        if (get_recv_message_type() != message_type::QUEUE || q_msg.size() > 0)
         {
             handle.recv();
             break;
@@ -123,9 +123,9 @@ client_res Client::on_recv_finished(unsigned bytesTransfered)
         return QUEUE_OP;
     case MESSAGING:
         
-        if (this->get_recv_message_type() == MST_TIMEOUT)
+        if (this->get_recv_message_type() == message_type::TIMEOUT)
             status = VOTING;
-        if (this->get_recv_message_type() == MST_LEAVE)
+        if (this->get_recv_message_type() == message_type::LEAVE)
             status = INIT;
         if (!this->safe_comp_send(msg))
         {
@@ -136,7 +136,7 @@ client_res Client::on_recv_finished(unsigned bytesTransfered)
         handle.recv();
         break;
     case VOTING:
-        if (get_recv_message_type()!= MST_VOTING)
+        if (get_recv_message_type()!= message_type::VOTING)
         {
             handle.recv();
             break;
@@ -160,7 +160,7 @@ client_res Client::on_send_finished(unsigned bytesTransfered)
         handle.recv();
         break;
     case INIT:
-        if (get_snd_message_type() == MST_QUEUE)
+        if (get_snd_message_type() == message_type::QUEUE)
         {
             auto p = companion.lock();
             if (p)
@@ -171,9 +171,9 @@ client_res Client::on_send_finished(unsigned bytesTransfered)
         }
         break;
     case MESSAGING:
-        if (this->get_snd_message_type() == MST_TIMEOUT)
+        if (this->get_snd_message_type() == message_type::TIMEOUT)
             status = VOTING;
-        if (this->get_snd_message_type() == MST_LEAVE)
+        if (this->get_snd_message_type() == message_type::LEAVE)
             status = INIT;
     default:
         break;
@@ -200,26 +200,26 @@ bool Client::safe_comp_send(std::string const& msg)
 
 bool Client::send_bad_vote()
 {
-    std::string s = { 42, MST_VOTING, 0 };
+    std::string s = { 42, static_cast<char>(message_type::VOTING), 0 };
     handle.send(s);
     return true;
 }
 
 bool Client::send_leaved()
 {
-    std::string s = { 42, MST_LEAVE };
+    std::string s = { 42, static_cast<char>(message_type::LEAVE) };
     handle.send(s);
     return true;
 }
 
-int Client::get_snd_message_type() const
+message_type Client::get_snd_message_type() const
 {
-    return this->handle.buf.send_buf.buf[1];
+    return static_cast<message_type>(this->handle.buf.send_buf.buf[1]);
 }
 
-int Client::get_recv_message_type() const
+message_type Client::get_recv_message_type() const
 {
-    return this->handle.buf.recv_buf.buf[1];
+    return static_cast<message_type>(this->handle.buf.recv_buf.buf[1]);
 }
 
 void Client::set_theme(char theme)

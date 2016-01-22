@@ -26,7 +26,6 @@ struct OVERLAPPED_EX : OVERLAPPED
 
 class socket_user
 {
-private:
     SOCKET sock;
     OVERLAPPED_EX* snd;
     OVERLAPPED_EX* rcv;
@@ -37,7 +36,6 @@ public:
     std::string read(unsigned bytes_count);
     explicit socket_user(SOCKET s);
     ~socket_user();
-    //socket_user();
     socket_user(const socket_user& other) = delete;
     socket_user& operator=(const socket_user& other) = delete;
     SOCKET get_socket() { return sock; };
@@ -55,13 +53,15 @@ enum client_statuses
     NEW, INIT, MESSAGING, VOTING
 };
 
-//Message types
-#define MST_QUEUE 1
-#define MST_MESSAGE 2
-#define MST_TIMEOUT 3
-#define MST_VOTING 4
-#define MST_DISCONNECT 10
-#define MST_LEAVE 69
+enum class message_type : char
+{
+    QUEUE = 1,
+    MESSAGE = 2,
+    TIMEOUT = 3,
+    VOTING = 4,
+    DISCONNECT = 10,
+    LEAVE = 69
+};
 
 class Client
 {
@@ -70,8 +70,8 @@ class Client
     std::weak_ptr<Client> companion;
     client_statuses status;
 
-    int get_recv_message_type() const;
-    int get_snd_message_type() const;
+    message_type get_recv_message_type() const;
+    message_type get_snd_message_type() const;
 
     bool safe_comp_send(std::string const&);
     bool send_leaved();
@@ -87,8 +87,6 @@ public:
 
     void on_pair_found(std::shared_ptr<Client>const& pair);
     void set_theme(char);
-    
-    //~Client() {};
 };
 
 constexpr static const int MAX_IDLENESS_TIME =
