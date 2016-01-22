@@ -118,7 +118,11 @@ void server::finish_accept() noexcept
             std::cout << "Error in inital send,"<<WSAGetLastError() << " drop client " << accepted->id << std::endl;
             this->drop_client(this->lastAccepted);
         }
-        g_func_queue.enqueue(lastAccepted->get_upd_f(g_io_completion_port), MAX_IDLENESS_TIME);
+        else 
+        {
+            g_func_queue.enqueue(lastAccepted->get_upd_f(g_io_completion_port), MAX_IDLENESS_TIME);
+        }
+        
         this->lastAccepted = nullptr;
         if (!this->accept()) throw std::exception("Can't start accept, WSA code" + WSAGetLastError());
     }
