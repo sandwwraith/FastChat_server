@@ -32,22 +32,6 @@ void client_queue::push(std::shared_ptr<Client> const& ptr)
     q.push_back(std::weak_ptr<Client>(ptr));
 }
 
-std::shared_ptr<Client> client_queue::try_pair(std::shared_ptr<Client> const& client)
-{
-    auto pair = this->pop();
-    if (pair)
-    {
-        /*client->set_companion(std::weak_ptr<Client>(pair));
-        pair->set_companion(std::weak_ptr<Client>(client));
-
-        char theme = distribution(generator);
-        client->q_msg[2] = theme;
-        pair->q_msg[2] = theme;*/
-        return pair;
-    }
-    return std::shared_ptr<Client>();
-}
-
 std::shared_ptr<Client> client_queue::pair_or_queue(std::shared_ptr<Client> const& cl)
 {
     auto p = pop();

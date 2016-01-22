@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
             std::cout << serv.clients_count() << std::endl;
             continue;
         }
-        std::cout << "Unknown command";
+        std::cout << "Unknown command"<<std::endl;
     }
     return 0;
 }

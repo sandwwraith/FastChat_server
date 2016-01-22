@@ -16,8 +16,6 @@ public:
     std::shared_ptr<Client>pop();
 
     //Makes pair and sets the theme for conversation
-    std::shared_ptr<Client> try_pair(std::shared_ptr<Client> const&);
-
     std::shared_ptr<Client> pair_or_queue(std::shared_ptr < Client>const&);
 
     client_queue(const client_queue& other) = delete;
