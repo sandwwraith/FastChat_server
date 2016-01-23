@@ -12,6 +12,7 @@
 #include <thread>
 #include <mutex>
 #include <memory>
+#include <array>
 
 inline uint64_t current_time() noexcept 
 {

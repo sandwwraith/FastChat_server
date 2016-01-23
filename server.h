@@ -10,43 +10,19 @@
 #include "client_queue.h"
 #include "client_storage.h"
 #include "function_queue.h"
+#include "wrappers.h"
 
 #pragma comment(lib,"Ws2_32.lib")
 
-struct server_launch_params
-{
-    sockaddr_in serv_address;
-
-    explicit server_launch_params(bool global)
-    {
-        if (global)
-            serv_address.sin_addr.S_un.S_addr = INADDR_ANY;
-        else
-            serv_address.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-        serv_address.sin_family = AF_INET;
-        serv_address.sin_port = htons(2539);
-    }
-
-    void set_port(int port)
-    {
-        serv_address.sin_port = htons(port);
-    }
-};
-
 class server
 {
-    //Global array of worker threads
-    HANDLE* g_worker_threads = nullptr;
+    friend class client_context;
+    friend class ThreadPool;
 
-    //Number of threads
-    int g_workers_count = 0;
-
-    //Number of threads per processor
-    int g_worker_threads_per_processor = 2;
-
-    //Main IOCP port
-    HANDLE g_io_completion_port; // TODO: wrap this into RAII object
+    WSAWrapper wsa_wrapper{};
+    IOCPWrapper IOCP{};
+    ThreadPool pool{ this };
+    ListenSocketWrapper listenSock;
 
     //Global storage for all clients
     client_queue g_client_queue;
@@ -54,26 +30,22 @@ class server
     function_queue g_func_queue;
 
     static DWORD WINAPI WorkerThread(LPVOID); //Worker function for threads
-    bool init();
-    void shutdown();
 
-    SOCKET create_listen_socket(server_launch_params);
-    SOCKET listenSock; // TODO: wrap this into RAII object
+    OVERLAPPED_EX overlapped_ac{ operation_code::ACCEPT };
+    std::array<char, sizeof(char)*(2 * sizeof(sockaddr_in) + 32)> accept_buf;
 
-    OVERLAPPED_EX* overlapped_ac; // TODO: remove *
-    char* accept_buf;             // TODO: std::array
-    client_context* lastAccepted = nullptr; // TODO: unique_ptr<client_context>
-    client_context* acceptContext = nullptr; // TODO: ditto
+    std::unique_ptr<client_context> lastAccepted;
+    std::unique_ptr<client_context> acceptContext;
 
     bool accept();
     void finish_accept() noexcept;
     unsigned long ids = 0;
 
     void drop_client(client_context*) noexcept;
-    friend class client_context;
+    
     void handle_queue_request(std::shared_ptr<Client>const&, DWORD);
-public:
 
+public:
     unsigned int clients_count() noexcept;
     explicit server(server_launch_params);
     server(const server& other) = delete;

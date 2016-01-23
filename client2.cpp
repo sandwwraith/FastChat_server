@@ -28,7 +28,15 @@ std::string socket_user::read(unsigned bytes_count)
 socket_user::socket_user(SOCKET s) : sock(s)
 {
     snd = new OVERLAPPED_EX(operation_code::SEND);
-    rcv = new OVERLAPPED_EX(operation_code::RECV);
+    try
+    {
+        rcv = new OVERLAPPED_EX(operation_code::RECV);
+    }
+    catch (...)
+    {
+        delete snd;
+        throw;
+    }
 }
 
 socket_user::~socket_user()

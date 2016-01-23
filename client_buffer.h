@@ -20,7 +20,10 @@ struct CLIENT_BUFFER
         recv_buf.len = MAX_BUFFER_SIZE;
 
         send_buf.buf = static_cast<char*>(malloc(MAX_BUFFER_SIZE*sizeof(char)));
-        if (send_buf.buf == nullptr) throw std::runtime_error("Memory error at buffer init");
+        if (send_buf.buf == nullptr) {
+            free(recv_buf.buf);
+            throw std::runtime_error("Memory error at buffer init");
+        }
         send_buf.len = MAX_BUFFER_SIZE;
     }
 
