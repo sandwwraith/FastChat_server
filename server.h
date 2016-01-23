@@ -46,7 +46,7 @@ class server
     int g_worker_threads_per_processor = 2;
 
     //Main IOCP port
-    HANDLE g_io_completion_port;
+    HANDLE g_io_completion_port; // TODO: wrap this into RAII object
 
     //Global storage for all clients
     client_queue g_client_queue;
@@ -58,12 +58,12 @@ class server
     void shutdown();
 
     SOCKET create_listen_socket(server_launch_params);
-    SOCKET listenSock;
+    SOCKET listenSock; // TODO: wrap this into RAII object
 
-    OVERLAPPED_EX* overlapped_ac;
-    char* accept_buf;
-    client_context* lastAccepted = nullptr;
-    client_context* acceptContext = nullptr;
+    OVERLAPPED_EX* overlapped_ac; // TODO: remove *
+    char* accept_buf;             // TODO: std::array
+    client_context* lastAccepted = nullptr; // TODO: unique_ptr<client_context>
+    client_context* acceptContext = nullptr; // TODO: ditto
 
     bool accept();
     void finish_accept() noexcept;
