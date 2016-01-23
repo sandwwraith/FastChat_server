@@ -42,9 +42,6 @@ class server
     //Number of threads
     int g_workers_count = 0;
 
-    //Number of processors in system
-    int g_processors_count = -1;
-
     //Number of threads per processor
     int g_worker_threads_per_processor = 2;
 
