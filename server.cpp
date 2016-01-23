@@ -261,10 +261,12 @@ bool server::init()
 #endif
 
     std::cout << "Threads count: " << g_workers_count << std::endl;
+    // TODO: replace g_worker_threads and g_workers_count with vector
     g_worker_threads = new HANDLE[g_workers_count];
 
     for (auto i = 0; i < g_workers_count;i++)
     {
+        // TODO: check error code
         g_worker_threads[i] = CreateThread(nullptr, 0, WorkerThread, this, 0, nullptr);
     }
     return true;
@@ -292,6 +294,7 @@ server::server(server_launch_params params)
 {
     overlapped_ac = new OVERLAPPED_EX{operation_code::ACCEPT};
     accept_buf = static_cast<char*>(malloc(sizeof(char)*(2 * sizeof(sockaddr_in) + 32)));
+    // TODO: move this throw inside init()
     if (!init()) throw std::runtime_error("Error in initializing");
     listenSock = create_listen_socket(params);
     if (listenSock == INVALID_SOCKET)
@@ -302,6 +305,7 @@ server::server(server_launch_params params)
     }
 
     acceptContext = new client_context(this, nullptr);
+    // TODO: check error code
     CreateIoCompletionPort((HANDLE)listenSock, g_io_completion_port, (ULONG_PTR)acceptContext, 0);
     if (!this->accept())
     {
