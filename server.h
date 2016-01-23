@@ -36,12 +36,6 @@ struct server_launch_params
 
 class server
 {
-    //Global parameter for server address/port
-    int g_server_port = 2539;
-
-    //If true, recieves on INADDR_ANY. localhost otherwise.
-    bool global_addr = false;
-
     //Global array of worker threads
     HANDLE* g_worker_threads = nullptr;
 
