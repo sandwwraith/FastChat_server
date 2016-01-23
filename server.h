@@ -19,23 +19,23 @@ class server
     friend class client_context;
     friend class ThreadPool;
 
+    std::unique_ptr<client_context> lastAccepted;
+    std::unique_ptr<client_context> acceptContext;
+
     WSAWrapper wsa_wrapper{};
     IOCPWrapper IOCP{};
-    ThreadPool pool{ this };
     ListenSocketWrapper listenSock;
 
     //Global storage for all clients
-    client_queue g_client_queue;
     client_storage g_client_storage;
+    client_queue g_client_queue;
     function_queue g_func_queue;
 
     static DWORD WINAPI WorkerThread(LPVOID); //Worker function for threads
+    ThreadPool pool{ this };
 
     OVERLAPPED_EX overlapped_ac{ operation_code::ACCEPT };
     std::array<char, sizeof(char)*(2 * sizeof(sockaddr_in) + 32)> accept_buf;
-
-    std::unique_ptr<client_context> lastAccepted;
-    std::unique_ptr<client_context> acceptContext;
 
     bool accept();
     void finish_accept() noexcept;

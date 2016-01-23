@@ -26,7 +26,8 @@ void function_queue::worker(function_queue* me)
         }
 
         auto t = me->event_q.top().at;
-        while (std::chrono::system_clock::now() < t) me->cv.wait_until(lck, t);
+        while (std::chrono::system_clock::now() < t && !me->cancelled) me->cv.wait_until(lck, t);
+        if (me->cancelled) return;
         auto e = me->safe_pop();
         e.runnable();
     }

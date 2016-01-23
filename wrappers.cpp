@@ -35,9 +35,10 @@ void ThreadPool::closethreads()
         //PostQueuedCompletionStatus(host->g_io_completion_port, 0, 0, nullptr);
         host->IOCP.post(nullptr, nullptr, 0);
     }
-    for (size_t i = 0; i < threads.size(); i++)
+    for (int i = threads.size()-1; i>=0; i--)
     {
         WaitForSingleObject(threads[i], INFINITE);
+        threads.pop_back();
     }
-    threads.clear();
+    //threads.clear();
 }

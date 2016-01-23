@@ -87,7 +87,8 @@ client_context::client_context(server* serv, Client* cl) : host(serv), ptr(cl)
 
 client_context::~client_context()
 {
-    over->op_code = operation_code::DELETED;
+    if (ptr) over->op_code = operation_code::DELETED;
+    else delete over;
 }
 
 bool client_context::isAlive() const noexcept

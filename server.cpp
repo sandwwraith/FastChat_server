@@ -203,5 +203,4 @@ server::server(server_launch_params params)
 server::~server()
 {
     std::cout << "Server is shutting down...\n";
-    g_client_storage.clear_all();
 }
