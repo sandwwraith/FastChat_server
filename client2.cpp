@@ -27,6 +27,7 @@ std::string socket_user::read(unsigned bytes_count)
 
 socket_user::socket_user(SOCKET s) : sock(s)
 {
+    // TODO: everytime you write code like this in means the class must be split
     snd = new OVERLAPPED_EX(operation_code::SEND);
     try
     {
