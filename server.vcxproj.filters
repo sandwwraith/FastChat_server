@@ -71,5 +71,8 @@
     <ClInclude Include="overlapped_ptr.h">
       <Filter>Заголовочные файлы</Filter>
     </ClInclude>
+    <ClInclude Include="overlapped_ex.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
