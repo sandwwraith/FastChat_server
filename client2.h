@@ -4,12 +4,13 @@
 
 #include "client_buffer.h"
 #include "overlapped_ex.h"
+#include "overlapped_ptr.h"
 
 class socket_user
 {
     SOCKET sock;
-    OVERLAPPED_EX* snd;
-    OVERLAPPED_EX* rcv;
+    overlapped_ptr snd;
+    overlapped_ptr rcv;
 public:
     CLIENT_BUFFER buf;
     void send(std::string const&);

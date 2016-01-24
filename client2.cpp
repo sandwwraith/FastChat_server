@@ -8,7 +8,7 @@ void socket_user::send(std::string const& message)
     buf.fill_send_buf(message);
     DWORD dwBytes = 0;
     DWORD dwFlags = 0;
-    auto res = WSASend(this->sock, &buf.send_buf, 1, &dwBytes, dwFlags, snd, nullptr);
+    auto res = WSASend(this->sock, &buf.send_buf, 1, &dwBytes, dwFlags, snd.get(), nullptr);
     if (res == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError()) throw std::runtime_error("Send error");
 }
 
@@ -16,7 +16,7 @@ void socket_user::recv()
 {
     DWORD dwBytes = 0, dwFlags = 0;
     buf.reset_recv_buf();
-    int snd = WSARecv(this->sock, &buf.recv_buf, 1, &dwBytes, &dwFlags, rcv, nullptr);
+    int snd = WSARecv(this->sock, &buf.recv_buf, 1, &dwBytes, &dwFlags, rcv.get(), nullptr);
     if (snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError()) throw std::runtime_error("Recieve error");
 }
 
@@ -25,29 +25,33 @@ std::string socket_user::read(unsigned bytes_count)
     return std::string{ buf.recv_buf.buf,bytes_count };
 }
 
-socket_user::socket_user(SOCKET s) : sock(s)
+socket_user::socket_user(SOCKET s)
+    : sock(s)
+    , snd(new OVERLAPPED_EX(operation_code::SEND))
+    , rcv(new OVERLAPPED_EX(operation_code::RECV))
 {
-    // TODO: everytime you write code like this in means the class must be split
-    snd = new OVERLAPPED_EX(operation_code::SEND);
-    try
-    {
-        rcv = new OVERLAPPED_EX(operation_code::RECV);
-    }
-    catch (...)
-    {
-        delete snd;
-        throw;
-    }
+    // TODO: everytime you write code like this:
+    //
+    // snd = new OVERLAPPED_EX(operation_code::SEND);
+    // try
+    // {
+    //     rcv = new OVERLAPPED_EX(operation_code::RECV);
+    // }
+    // catch (...)
+    // {
+    //     delete snd;
+    //     throw;
+    // }
+    //
+    // I have introduced a new class overlapped_ptr (see overlapped_ptr.h)
+    // Could you please check that everything still works correctly and apply it in every place you
+    // delete/mark OVERLAPPED_EX as DELETED manually.
+
+    // TODO(question): should not overlapped_ptr be used in server::overlapped_ac?
 }
 
 socket_user::~socket_user()
 {
-    if (HasOverlappedIoCompleted(snd)) delete snd;
-    else snd->op_code = operation_code::DELETED;
-
-    if (HasOverlappedIoCompleted(rcv)) delete rcv;
-    else rcv->op_code = operation_code::DELETED;
-
     closesocket(sock);
 }
 

@@ -144,6 +144,7 @@ bool server::accept()
 
     if (!b && WSAGetLastError() != WSA_IO_PENDING) {
         std::cout << "AcceptEx failed: " << WSAGetLastError() << std::endl;
+        // TODO: shouldn't acc_socket be closed here?
         return false;
     }
 
