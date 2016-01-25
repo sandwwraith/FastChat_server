@@ -106,13 +106,15 @@ void client_context::updateTimer() noexcept
     lastActivity = current_time();
 }
 
-std::function<void()> client_context::get_upd_f(HANDLE comp_port) noexcept
+std::function<void()> client_context::get_upd_f() noexcept
 {
-    //Save overlapped as member of anonymous class, because THIS can be deleted at moment of run operator()
-    LPOVERLAPPED over_ptr = (LPOVERLAPPED)this->over;
+    //Save parametres as members of anonymous class, because THIS can be deleted at moment of run operator()
+    OVERLAPPED_EX* over_ptr = this->over;
+    server* serv = this->host;
     return [=]()
         {
-            PostQueuedCompletionStatus(comp_port, 1, (ULONG_PTR)this, over_ptr);
+            //PostQueuedCompletionStatus(comp_port, 1, (ULONG_PTR)this, over_ptr);
+            serv->IOCP.post(this, over_ptr, 1);
         };
 }
 

@@ -94,7 +94,7 @@ public:
 
     bool isAlive() const noexcept;
     void updateTimer() noexcept;
-    std::function<void()> get_upd_f(HANDLE comp_port) noexcept;
+    std::function<void()> get_upd_f() noexcept;
 
     client_context(const client_context& other) = delete;
     client_context& operator=(const client_context& other) = delete;

@@ -103,11 +103,13 @@ struct ListenSocketWrapper
 
 struct IOCPWrapper
 {
-    // TODO: I think this variable should be made private
-    // for this we need to write a wrapper for GetQueuedCompletionStatus here
-    // and use IOCPWrapper::post in get_upd_f.
-
+private:
     HANDLE iocp_port;
+public:
+    inline bool Dequeue(client_context*& a,DWORD& dwBytesTransfered, OVERLAPPED*& oveer) noexcept
+    {
+        return GetQueuedCompletionStatus(iocp_port, &dwBytesTransfered, (PULONG_PTR)&a,&oveer, INFINITE) != 0;
+    }
 
     inline IOCPWrapper()
     {
@@ -135,7 +137,7 @@ struct IOCPWrapper
         // I think it is very strange to get an exception on a server destroy
         // According to documentation, the most likely case to fail is when passed
         // parameter is not a HANDLE or already closed.
-        assert (CloseHandle(iocp_port) !=0, "IOCP close error");
+        assert (CloseHandle(iocp_port) !=0);
     }
 
     IOCPWrapper(const IOCPWrapper& other) = delete;

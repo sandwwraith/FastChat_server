@@ -4,14 +4,13 @@
 DWORD server::WorkerThread(LPVOID param)
 {
     server* me = static_cast<server*>(param);
-    void* void_context = nullptr;
+    client_context* context;
     OVERLAPPED* overlapped = nullptr;
     OVERLAPPED_EX* overlapped_ex;
     DWORD dwBytesTransfered = 0;
     while (true)
     {
-        BOOL queued_result = GetQueuedCompletionStatus(me->IOCP.iocp_port, &dwBytesTransfered,
-            (PULONG_PTR)&void_context, &overlapped, INFINITE);
+        bool queued_result = me->IOCP.Dequeue(context, dwBytesTransfered, overlapped);
 
         if (!queued_result)
         {
@@ -19,7 +18,7 @@ DWORD server::WorkerThread(LPVOID param)
              //121 = ERROR_SEM_TIMEOUT; 64 = NET_NAME_INVALID, need to delete client
             if (err_code == ERROR_SEM_TIMEOUT || err_code == ERROR_NETNAME_DELETED)
             {
-                me->drop_client(static_cast<client_context*>(void_context));
+                me->drop_client(context);
             }
             else if (err_code == ERROR_CONNECTION_ABORTED || err_code == ERROR_OPERATION_ABORTED) //Closed socket
             {
@@ -29,7 +28,7 @@ DWORD server::WorkerThread(LPVOID param)
             continue;
         }
 
-        if (void_context == nullptr) //Signal to shutdown
+        if (context == nullptr) //Signal to shutdown
         {
             return 0;
         }
@@ -41,7 +40,6 @@ DWORD server::WorkerThread(LPVOID param)
             continue;
         }
 
-        client_context* context = static_cast<client_context*>(void_context);
         if (overlapped_ex->op_code == operation_code::KEEP_ALIVE)
         {
             if (!context->isAlive())
@@ -53,7 +51,7 @@ DWORD server::WorkerThread(LPVOID param)
             else
             {
                 //post another kill delay
-                me->g_func_queue.enqueue(context->get_upd_f(me->IOCP.iocp_port), MAX_IDLENESS_TIME);
+                me->g_func_queue.enqueue(context->get_upd_f(), MAX_IDLENESS_TIME);
             }
             continue;
         }
@@ -94,7 +92,7 @@ void server::finish_accept() noexcept
         {
             this->g_client_storage.attach_client(std::move(this->lastAccepted));
             accepted->send_greetings(g_client_storage.clients_count());
-            g_func_queue.enqueue(curr_val->get_upd_f(IOCP.iocp_port), MAX_IDLENESS_TIME);
+            g_func_queue.enqueue(curr_val->get_upd_f(), MAX_IDLENESS_TIME);
         } 
         catch (std::exception const& ex)
         {
@@ -147,7 +145,7 @@ void server::accept()
     try {
         IOCP.bind(acc_socket, lastAccepted.get());
     }
-    catch (std::exception const& e)
+    catch (std::exception const&)
     {   
         lastAccepted.reset();
         throw;
