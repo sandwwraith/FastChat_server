@@ -126,14 +126,16 @@ struct IOCPWrapper
 
     inline void post(client_context* context, OVERLAPPED_EX* overlapped, DWORD bytes)
     {
-        // TODO: shouldn't we check for an error here?
-        PostQueuedCompletionStatus(iocp_port, bytes, (ULONG_PTR)context, (LPOVERLAPPED)overlapped);
+        if (PostQueuedCompletionStatus(iocp_port, bytes, (ULONG_PTR)context, (LPOVERLAPPED)overlapped) == 0)
+            throw std::runtime_error("Cannot post in IOCP: " + GetLastError());
     }
 
     inline ~IOCPWrapper()
     {
-        // TODO: shouldn't we check for an error here and at least assert it?
-        CloseHandle(iocp_port);
+        // I think it is very strange to get an exception on a server destroy
+        // According to documentation, the most likely case to fail is when passed
+        // parameter is not a HANDLE or already closed.
+        assert (CloseHandle(iocp_port) !=0, "IOCP close error");
     }
 
     IOCPWrapper(const IOCPWrapper& other) = delete;

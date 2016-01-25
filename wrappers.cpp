@@ -16,15 +16,11 @@ ThreadPool::ThreadPool(server* host) : host(host)
     std::cout << "Threads count: " << g_workers_count << std::endl;
     for (auto i = 0; i < g_workers_count;i++)
     {
-        // TODO: check error code
         HANDLE a = CreateThread(nullptr, 0, server::WorkerThread, host, 0, nullptr);
         if (a == INVALID_HANDLE_VALUE)
         {
             closethreads();
-
-            // TODO: after this break the constructor quits successfully with 0 threads
-            // Is this intended? I believe we should report this error back to caller
-            break;
+            throw std::runtime_error("Cannot create thread: " + GetLastError());
         }
         threads.push_back(a);
     }
@@ -35,7 +31,6 @@ void ThreadPool::closethreads()
     for (size_t i = 0;i < threads.size(); i++)
     {
         //Signal for threads - if they get NULL context, they shutdown.
-        //PostQueuedCompletionStatus(host->g_io_completion_port, 0, 0, nullptr);
         host->IOCP.post(nullptr, nullptr, 0);
     }
     while (!threads.empty())
@@ -43,5 +38,4 @@ void ThreadPool::closethreads()
         WaitForSingleObject(threads.back(), INFINITE);
         threads.pop_back();
     }
-    //threads.clear();
 }
