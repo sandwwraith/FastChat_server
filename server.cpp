@@ -92,20 +92,19 @@ void server::finish_accept() noexcept
             std::cout << "Set sock opt failed: " << WSAGetLastError() << std::endl;
         }
 
-        client_context* curr_val = this->lastAccepted.get();
-        this->g_client_storage.attach_client(std::move(this->lastAccepted));
-
-        if (!accepted->send_greetings(this->g_client_storage.clients_count()))
+        client_context* curr_val = this->lastAccepted.get();        
+        try
         {
-            std::cout << "Error in inital send,"<<WSAGetLastError() << " drop client " << accepted->id << std::endl;
+            this->g_client_storage.attach_client(std::move(this->lastAccepted));
+            accepted->send_greetings(g_client_storage.clients_count());
+            g_func_queue.enqueue(curr_val->get_upd_f(IOCP.iocp_port), MAX_IDLENESS_TIME);
+        } 
+        catch (std::exception const& ex)
+        {
+            std::cout << "Can't accept this client: " << ex.what() << std::endl;
             this->drop_client(curr_val);
         }
-        else 
-        {
-            g_func_queue.enqueue(curr_val->get_upd_f(IOCP.iocp_port), MAX_IDLENESS_TIME);
-        }
-        
-        if (!this->accept()) throw std::exception("Can't start accept, WSA code" + WSAGetLastError());
+        this->accept();
     }
     catch (std::exception const& ex)
     {
@@ -115,7 +114,7 @@ void server::finish_accept() noexcept
 }
 
 
-bool server::accept()
+void server::accept()
 {
     GUID GuidAcceptEx = WSAID_ACCEPTEX;
     LPFN_ACCEPTEX lpfnAcceptEx = nullptr;
@@ -127,15 +126,13 @@ bool server::accept()
 
     if (res == SOCKET_ERROR)
     {
-        std::cout << "Can't get pointer: " << WSAGetLastError() << std::endl;
-        return false;
+        throw std::runtime_error("Can't get pointer: " + WSAGetLastError());
     }
 
     SOCKET acc_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
     if (acc_socket == INVALID_SOCKET)
     {
-        std::cout << "Can't create listen socket: " << WSAGetLastError() << std::endl;
-        return false;
+        throw std::runtime_error("Can't create listen socket: " + WSAGetLastError());
     }
 
     BOOL b = lpfnAcceptEx(listenSock.sock, acc_socket
@@ -143,9 +140,8 @@ bool server::accept()
         , &dwBytes, &overlapped_ac);
 
     if (!b && WSAGetLastError() != WSA_IO_PENDING) {
-        std::cout << "AcceptEx failed: " << WSAGetLastError() << std::endl;
-        // TODO: shouldn't acc_socket be closed here?
-        return false;
+        closesocket(acc_socket);
+        throw std::runtime_error("AcceptEx failed: " + WSAGetLastError());
     }
 
     Client* cl = new Client(acc_socket);
@@ -157,10 +153,8 @@ bool server::accept()
     catch (std::exception const& e)
     {   
         lastAccepted.reset();
-        std::cout << "Can't bind new client to comp port: " << e.what()<< " " <<  GetLastError() << std::endl;
-        return false;
+        throw;
     }
-    return true;
 }
 
 
@@ -196,10 +190,7 @@ server::server(server_launch_params params)
     listenSock.bind_and_listen(params);
     acceptContext = std::make_unique<client_context>(this, nullptr);
     IOCP.bind(listenSock.sock, acceptContext.get());
-    if (!this->accept())
-    {
-        throw std::exception("Cannot accept");
-    }
+    accept();
 
     std::cout << "All OK, waiting for the connections" << std::endl;
 }

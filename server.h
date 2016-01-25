@@ -37,7 +37,7 @@ class server
     OVERLAPPED_EX overlapped_ac{ operation_code::ACCEPT };
     std::array<char, sizeof(char)*(2 * sizeof(sockaddr_in) + 32)> accept_buf;
 
-    bool accept();
+    void accept();
     void finish_accept() noexcept;
     unsigned long ids = 0;
 

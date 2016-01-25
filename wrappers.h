@@ -121,7 +121,7 @@ struct IOCPWrapper
     inline void bind(SOCKET socket, client_context* context)
     {
         if (CreateIoCompletionPort((HANDLE)socket, iocp_port, (ULONG_PTR)context, 0) == nullptr)
-            throw std::runtime_error("cannot bind client to port!");
+            throw std::runtime_error("cannot bind client to port!" + GetLastError());
     }
 
     inline void post(client_context* context, OVERLAPPED_EX* overlapped, DWORD bytes)
