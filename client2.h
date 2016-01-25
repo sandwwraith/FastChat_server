@@ -25,7 +25,8 @@ class socket_user
     overlapped_ptr snd;
     overlapped_ptr rcv;
 public:
-    CLIENT_BUFFER buf;
+    CLIENT_BUFFER snd_buf;
+    CLIENT_BUFFER rcv_buf;
     void send(std::string const&);
     void recv();
     std::string read(unsigned bytes_count);
@@ -86,7 +87,7 @@ public:
 
 constexpr static const int MAX_IDLENESS_TIME =
 #ifdef _DEBUG
-15
+20
 #else
 (10 * 60)
 #endif

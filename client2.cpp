@@ -5,24 +5,24 @@
 
 void socket_user::send(std::string const& message)
 {
-    buf.fill_send_buf(message);
+    snd_buf.fill_buf(message);
     DWORD dwBytes = 0;
     DWORD dwFlags = 0;
-    auto res = WSASend(this->sock, &buf.send_buf, 1, &dwBytes, dwFlags, snd.get(), nullptr);
+    auto res = WSASend(this->sock, &snd_buf.buffer, 1, &dwBytes, dwFlags, snd.get(), nullptr);
     if (res == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError()) throw std::runtime_error("Send error");
 }
 
 void socket_user::recv()
 {
     DWORD dwBytes = 0, dwFlags = 0;
-    buf.reset_recv_buf();
-    int snd = WSARecv(this->sock, &buf.recv_buf, 1, &dwBytes, &dwFlags, rcv.get(), nullptr);
+    rcv_buf.reset();
+    int snd = WSARecv(this->sock, &rcv_buf.buffer, 1, &dwBytes, &dwFlags, rcv.get(), nullptr);
     if (snd == SOCKET_ERROR && WSA_IO_PENDING != WSAGetLastError()) throw std::runtime_error("Recieve error");
 }
 
 std::string socket_user::read(unsigned bytes_count)
 {
-    return std::string{ buf.recv_buf.buf,bytes_count };
+    return std::string{ rcv_buf.buffer.buf,bytes_count };
 }
 
 socket_user::socket_user(SOCKET s)
@@ -64,13 +64,13 @@ void client_context::on_overlapped_io_finished(unsigned bytesTransfered, OVERLAP
 
 }
 
-client_context::client_context(server* serv, Client* cl) :
-    host(serv),
-    ptr(cl),
-    over(ptr ? new OVERLAPPED_EX{operation_code::KEEP_ALIVE} : nullptr)
-//client_context with client==nullptr is used as dummy context for ACCEPT event
-//Therefore, we can't create new KEEP_ALIVE for such dummy client, 'cause it will
-//never get to function queue->never get to IOCP -> never be deleted
+client_context::client_context(server* serv, Client* cl) 
+    : host(serv)
+    , ptr(cl)
+    , over(ptr ? new OVERLAPPED_EX{operation_code::KEEP_ALIVE} : nullptr)
+    //client_context with client==nullptr is used as dummy context for ACCEPT event
+    //Therefore, we can't create new KEEP_ALIVE for such dummy client, 'cause it will
+    //never get to function queue->never get to IOCP -> never be deleted
 { }
 
 client_context::~client_context()
@@ -209,12 +209,12 @@ bool Client::send_leaved()
 
 message_type Client::get_snd_message_type() const
 {
-    return static_cast<message_type>(this->handle.buf.send_buf.buf[1]);
+    return static_cast<message_type>(this->handle.snd_buf.buffer.buf[1]);
 }
 
 message_type Client::get_recv_message_type() const
 {
-    return static_cast<message_type>(this->handle.buf.recv_buf.buf[1]);
+    return static_cast<message_type>(this->handle.rcv_buf.buffer.buf[1]);
 }
 
 void Client::set_theme(char theme)
