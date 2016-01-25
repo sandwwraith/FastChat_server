@@ -45,8 +45,8 @@ DWORD server::WorkerThread(LPVOID param)
             if (!context->isAlive())
             {
                 std::cout << context->ptr->id << " idleness time exceeded" << std::endl;
-                delete overlapped_ex;
                 me->drop_client(context);
+                delete overlapped_ex;
             }
             else
             {

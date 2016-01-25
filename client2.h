@@ -6,9 +6,22 @@
 #include "overlapped_ex.h"
 #include "overlapped_ptr.h"
 
+
 class socket_user
 {
-    SOCKET sock;
+    struct socket_wrapper
+    {
+    private:
+        SOCKET so;
+    public:
+        socket_wrapper(SOCKET s) : so(s) {};
+        inline ~socket_wrapper() { closesocket(so); }
+        operator SOCKET() { return so; }
+    };
+    //This wrapper structure is necessary for overlapped pointers
+    // be deleted (or marked as) before the socket closure.
+
+    socket_wrapper sock;
     overlapped_ptr snd;
     overlapped_ptr rcv;
 public:
@@ -73,7 +86,7 @@ public:
 
 constexpr static const int MAX_IDLENESS_TIME =
 #ifdef _DEBUG
-30
+15
 #else
 (10 * 60)
 #endif
@@ -82,12 +95,13 @@ constexpr static const int MAX_IDLENESS_TIME =
 class client_context
 {
     server* host;
-
     uint64_t lastActivity;
-    OVERLAPPED_EX* over;
+public:
+    std::shared_ptr<Client> ptr;
+private:
+    overlapped_ptr over;
 public:
     
-    std::shared_ptr<Client> ptr;
     void on_overlapped_io_finished(unsigned bytesTransfered, OVERLAPPED_EX* overlapped) noexcept;
     explicit client_context(server* serv, Client* cl);
     ~client_context();

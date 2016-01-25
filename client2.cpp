@@ -52,7 +52,7 @@ socket_user::socket_user(SOCKET s)
 
 socket_user::~socket_user()
 {
-    closesocket(sock);
+    //closesocket(sock);
 }
 
 void client_context::on_overlapped_io_finished(unsigned bytesTransfered, OVERLAPPED_EX* overlapped) noexcept
@@ -85,15 +85,20 @@ void client_context::on_overlapped_io_finished(unsigned bytesTransfered, OVERLAP
 
 }
 
-client_context::client_context(server* serv, Client* cl) : host(serv), ptr(cl) 
+client_context::client_context(server* serv, Client* cl) :
+    host(serv),
+    ptr(cl),
+    over(ptr ? new OVERLAPPED_EX{operation_code::KEEP_ALIVE} : nullptr)
+//client_context with client==nullptr is used as dummy context for ACCEPT event
+//Therefore, we can't create new KEEP_ALIVE for such dummy client, 'cause it will
+//never get to function queue->never get to IOCP -> never be deleted
 {
-    over = new OVERLAPPED_EX{ operation_code::KEEP_ALIVE };
 }
 
 client_context::~client_context()
 {
-    if (ptr) over->op_code = operation_code::DELETED;
-    else delete over;
+   // if (ptr) over->op_code = operation_code::DELETED;
+    //else delete over;
 }
 
 bool client_context::isAlive() const noexcept
@@ -109,7 +114,7 @@ void client_context::updateTimer() noexcept
 std::function<void()> client_context::get_upd_f() noexcept
 {
     //Save parametres as members of anonymous class, because THIS can be deleted at moment of run operator()
-    OVERLAPPED_EX* over_ptr = this->over;
+    OVERLAPPED_EX* over_ptr = this->over.get();
     server* serv = this->host;
     return [=]()
         {
