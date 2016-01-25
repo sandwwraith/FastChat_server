@@ -148,6 +148,7 @@
     <ClCompile Include="client_storage.cpp" />
     <ClCompile Include="function_queue.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="overlapped_ptr.cpp" />
     <ClCompile Include="server.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -161,6 +162,8 @@
     <ClInclude Include="client_queue.h" />
     <ClInclude Include="client_storage.h" />
     <ClInclude Include="function_queue.h" />
+    <ClInclude Include="overlapped_ex.h" />
+    <ClInclude Include="overlapped_ptr.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="wrappers.h" />

@@ -21,6 +21,9 @@ ThreadPool::ThreadPool(server* host) : host(host)
         if (a == INVALID_HANDLE_VALUE)
         {
             closethreads();
+
+            // TODO: after this break the constructor quits successfully with 0 threads
+            // Is this intended? I believe we should report this error back to caller
             break;
         }
         threads.push_back(a);
@@ -35,9 +38,9 @@ void ThreadPool::closethreads()
         //PostQueuedCompletionStatus(host->g_io_completion_port, 0, 0, nullptr);
         host->IOCP.post(nullptr, nullptr, 0);
     }
-    for (int i = threads.size()-1; i>=0; i--)
+    while (!threads.empty())
     {
-        WaitForSingleObject(threads[i], INFINITE);
+        WaitForSingleObject(threads.back(), INFINITE);
         threads.pop_back();
     }
     //threads.clear();

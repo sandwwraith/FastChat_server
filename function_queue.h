@@ -15,7 +15,7 @@ struct _fq_event
 };
 struct _fq_event_comparator
 {
-    bool operator() (_fq_event const&l, _fq_event const& r) {
+    bool operator() (_fq_event const&l, _fq_event const& r) const {
         return l.at > r.at; //Because default heap is maximum-based
     }
 };

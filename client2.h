@@ -3,32 +3,14 @@
 #include <string>
 
 #include "client_buffer.h"
-
-//Operation codes for clients
-enum class operation_code : unsigned
-{
-    //Server sends data to client
-    SEND = 1,
-    //Server recievs data
-    RECV = 2,
-    //Special codes
-    KEEP_ALIVE = 10,
-    ACCEPT = 11,
-    DELETED = 12,
-};
-
-struct OVERLAPPED_EX : OVERLAPPED
-{
-    operation_code op_code;
-
-    explicit OVERLAPPED_EX(operation_code op_code) : OVERLAPPED{}, op_code(op_code){}
-};
+#include "overlapped_ex.h"
+#include "overlapped_ptr.h"
 
 class socket_user
 {
     SOCKET sock;
-    OVERLAPPED_EX* snd;
-    OVERLAPPED_EX* rcv;
+    overlapped_ptr snd;
+    overlapped_ptr rcv;
 public:
     CLIENT_BUFFER buf;
     void send(std::string const&);

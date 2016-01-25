@@ -41,6 +41,9 @@ DWORD server::WorkerThread(LPVOID param)
             continue;
         }
 
+        // TODO: I have got question.
+        // When we receive operation_code::KEEP_ALIVE we post another KEEP_ALIVE event.
+        // Doesn't this lead to 100% one core CPU usage when one client is connected?
         client_context* context = static_cast<client_context*>(void_context);
         if (overlapped_ex->op_code == operation_code::KEEP_ALIVE)
         {
@@ -141,6 +144,7 @@ bool server::accept()
 
     if (!b && WSAGetLastError() != WSA_IO_PENDING) {
         std::cout << "AcceptEx failed: " << WSAGetLastError() << std::endl;
+        // TODO: shouldn't acc_socket be closed here?
         return false;
     }
 

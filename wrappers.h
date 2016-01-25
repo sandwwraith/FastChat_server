@@ -103,6 +103,10 @@ struct ListenSocketWrapper
 
 struct IOCPWrapper
 {
+    // TODO: I think this variable should be made private
+    // for this we need to write a wrapper for GetQueuedCompletionStatus here
+    // and use IOCPWrapper::post in get_upd_f.
+
     HANDLE iocp_port;
 
     inline IOCPWrapper()
@@ -122,11 +126,13 @@ struct IOCPWrapper
 
     inline void post(client_context* context, OVERLAPPED_EX* overlapped, DWORD bytes)
     {
+        // TODO: shouldn't we check for an error here?
         PostQueuedCompletionStatus(iocp_port, bytes, (ULONG_PTR)context, (LPOVERLAPPED)overlapped);
     }
 
     inline ~IOCPWrapper()
     {
+        // TODO: shouldn't we check for an error here and at least assert it?
         CloseHandle(iocp_port);
     }
 

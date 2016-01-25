@@ -39,6 +39,9 @@
     <ClCompile Include="wrappers.cpp">
       <Filter>Файлы исходного кода</Filter>
     </ClCompile>
+    <ClCompile Include="overlapped_ptr.cpp">
+      <Filter>Файлы исходного кода</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client_storage.h">
@@ -63,6 +66,12 @@
       <Filter>Заголовочные файлы</Filter>
     </ClInclude>
     <ClInclude Include="wrappers.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
+    <ClInclude Include="overlapped_ptr.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
+    <ClInclude Include="overlapped_ex.h">
       <Filter>Заголовочные файлы</Filter>
     </ClInclude>
   </ItemGroup>
