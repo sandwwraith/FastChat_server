@@ -29,31 +29,10 @@ socket_user::socket_user(SOCKET s)
     : sock(s)
     , snd(new OVERLAPPED_EX(operation_code::SEND))
     , rcv(new OVERLAPPED_EX(operation_code::RECV))
-{
-    // TODO: everytime you write code like this:
-    //
-    // snd = new OVERLAPPED_EX(operation_code::SEND);
-    // try
-    // {
-    //     rcv = new OVERLAPPED_EX(operation_code::RECV);
-    // }
-    // catch (...)
-    // {
-    //     delete snd;
-    //     throw;
-    // }
-    //
-    // I have introduced a new class overlapped_ptr (see overlapped_ptr.h)
-    // Could you please check that everything still works correctly and apply it in every place you
-    // delete/mark OVERLAPPED_EX as DELETED manually.
-
-    // TODO(question): should not overlapped_ptr be used in server::overlapped_ac?
-}
+{ }
 
 socket_user::~socket_user()
-{
-    //closesocket(sock);
-}
+{ }
 
 void client_context::on_overlapped_io_finished(unsigned bytesTransfered, OVERLAPPED_EX* overlapped) noexcept
 {
@@ -92,14 +71,10 @@ client_context::client_context(server* serv, Client* cl) :
 //client_context with client==nullptr is used as dummy context for ACCEPT event
 //Therefore, we can't create new KEEP_ALIVE for such dummy client, 'cause it will
 //never get to function queue->never get to IOCP -> never be deleted
-{
-}
+{ }
 
 client_context::~client_context()
-{
-   // if (ptr) over->op_code = operation_code::DELETED;
-    //else delete over;
-}
+{ }
 
 bool client_context::isAlive() const noexcept
 {
@@ -118,7 +93,6 @@ std::function<void()> client_context::get_upd_f() noexcept
     server* serv = this->host;
     return [=]()
         {
-            //PostQueuedCompletionStatus(comp_port, 1, (ULONG_PTR)this, over_ptr);
             serv->IOCP.post(this, over_ptr, 1);
         };
 }

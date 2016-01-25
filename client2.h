@@ -9,19 +9,19 @@
 
 class socket_user
 {
-    struct socket_wrapper
+    struct _socket_wrapper
     {
     private:
         SOCKET so;
     public:
-        socket_wrapper(SOCKET s) : so(s) {};
-        inline ~socket_wrapper() { closesocket(so); }
+        _socket_wrapper(SOCKET s) : so(s) {};
+        inline ~_socket_wrapper() { closesocket(so); }
         operator SOCKET() { return so; }
     };
     //This wrapper structure is necessary for overlapped pointers
     // be deleted (or marked as) before the socket closure.
 
-    socket_wrapper sock;
+    _socket_wrapper sock;
     overlapped_ptr snd;
     overlapped_ptr rcv;
 public:
