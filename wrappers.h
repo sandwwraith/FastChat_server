@@ -137,7 +137,8 @@ public:
         // I think it is very strange to get an exception on a server destroy
         // According to documentation, the most likely case to fail is when passed
         // parameter is not a HANDLE or already closed.
-        assert (CloseHandle(iocp_port) !=0);
+        BOOL r = CloseHandle(iocp_port);
+        assert (r != FALSE);
     }
 
     IOCPWrapper(const IOCPWrapper& other) = delete;
