@@ -26,13 +26,13 @@ class server
     IOCPWrapper IOCP{};
     ListenSocketWrapper listenSock;
 
+    static DWORD WINAPI WorkerThread(LPVOID); //Worker function for threads
+    ThreadPool pool{ this };
+
     //Global storage for all clients
     client_storage g_client_storage;
     client_queue g_client_queue;
     function_queue g_func_queue;
-
-    static DWORD WINAPI WorkerThread(LPVOID); //Worker function for threads
-    ThreadPool pool{ this };
 
     OVERLAPPED_EX overlapped_ac{ operation_code::ACCEPT };
     std::array<char, sizeof(char)*(2 * sizeof(sockaddr_in) + 32)> accept_buf;
