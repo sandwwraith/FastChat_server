@@ -20,7 +20,7 @@ ThreadPool::ThreadPool(server* host) : host(host)
         if (a == INVALID_HANDLE_VALUE)
         {
             closethreads();
-            throw std::runtime_error("Cannot create thread: " + GetLastError());
+            throw std::runtime_error("Cannot create thread: " + std::to_string(GetLastError()));
         }
         threads.push_back(a);
     }
